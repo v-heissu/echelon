@@ -7,10 +7,12 @@ export async function GET() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { data: profile } = await supabase.from('users').select('role').eq('id', user.id).single();
+  const admin = createAdminClient();
+
+  const { data: profile } = await admin.from('users').select('role').eq('id', user.id).single();
   if (profile?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
-  const { data: users, error } = await supabase
+  const { data: users, error } = await admin
     .from('users')
     .select('*, project_users(project_id, role, projects(name, slug))')
     .order('created_at', { ascending: false });
@@ -25,7 +27,9 @@ export async function POST(request: Request) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { data: profile } = await supabase.from('users').select('role').eq('id', user.id).single();
+  const admin = createAdminClient();
+
+  const { data: profile } = await admin.from('users').select('role').eq('id', user.id).single();
   if (profile?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const { email, display_name } = await request.json();
@@ -33,10 +37,8 @@ export async function POST(request: Request) {
   // Generate temp password
   const tempPassword = Math.random().toString(36).slice(-12) + 'A1!';
 
-  const adminClient = createAdminClient();
-
   // Create auth user
-  const { data: authUser, error: authError } = await adminClient.auth.admin.createUser({
+  const { data: authUser, error: authError } = await admin.auth.admin.createUser({
     email,
     password: tempPassword,
     email_confirm: true,
@@ -45,7 +47,7 @@ export async function POST(request: Request) {
   if (authError) return NextResponse.json({ error: authError.message }, { status: 500 });
 
   // Create user profile
-  const { error: profileError } = await adminClient.from('users').insert({
+  const { error: profileError } = await admin.from('users').insert({
     id: authUser.user.id,
     email,
     display_name: display_name || email.split('@')[0],

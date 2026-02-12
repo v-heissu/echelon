@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 export async function GET(
   _request: Request,
@@ -9,7 +10,9 @@ export async function GET(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { data: project, error } = await supabase
+  const admin = createAdminClient();
+
+  const { data: project, error } = await admin
     .from('projects')
     .select('*, project_users(user_id, role, users(id, email, display_name))')
     .eq('slug', params.slug)
@@ -28,12 +31,14 @@ export async function PUT(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { data: profile } = await supabase.from('users').select('role').eq('id', user.id).single();
+  const admin = createAdminClient();
+
+  const { data: profile } = await admin.from('users').select('role').eq('id', user.id).single();
   if (profile?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const body = await request.json();
 
-  const { data: project, error } = await supabase
+  const { data: project, error } = await admin
     .from('projects')
     .update({
       name: body.name,
@@ -64,10 +69,12 @@ export async function DELETE(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { data: profile } = await supabase.from('users').select('role').eq('id', user.id).single();
+  const admin = createAdminClient();
+
+  const { data: profile } = await admin.from('users').select('role').eq('id', user.id).single();
   if (profile?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
-  const { error } = await supabase.from('projects').delete().eq('slug', params.slug);
+  const { error } = await admin.from('projects').delete().eq('slug', params.slug);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 interface ThemeDensity {
   theme: string;
@@ -15,7 +16,9 @@ export async function GET(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { data: project } = await supabase
+  const admin = createAdminClient();
+
+  const { data: project } = await admin
     .from('projects')
     .select('id')
     .eq('slug', params.slug)
@@ -24,7 +27,7 @@ export async function GET(
   if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 });
 
   // Get all completed scans
-  const { data: scans } = await supabase
+  const { data: scans } = await admin
     .from('scans')
     .select('id, completed_at')
     .eq('project_id', project.id)
@@ -39,7 +42,7 @@ export async function GET(
   const scanDensities: { scanId: string; date: string; themes: ThemeDensity[] }[] = [];
 
   for (const scan of scans) {
-    const { data: results } = await supabase
+    const { data: results } = await admin
       .from('serp_results')
       .select('ai_analysis(themes)')
       .eq('scan_id', scan.id);

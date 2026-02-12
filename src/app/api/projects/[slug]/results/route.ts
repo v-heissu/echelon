@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 export async function GET(
   request: Request,
@@ -8,6 +9,8 @@ export async function GET(
   const supabase = createServerSupabase();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  const admin = createAdminClient();
 
   const { searchParams } = new URL(request.url);
   const keyword = searchParams.get('keyword');
@@ -21,7 +24,7 @@ export async function GET(
   const offset = (page - 1) * limit;
 
   // Get project
-  const { data: project } = await supabase
+  const { data: project } = await admin
     .from('projects')
     .select('id')
     .eq('slug', params.slug)
@@ -30,7 +33,7 @@ export async function GET(
   if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 });
 
   // Build query
-  let query = supabase
+  let query = admin
     .from('serp_results')
     .select(
       '*, ai_analysis(*), scans!inner(project_id, completed_at)',

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 export async function GET(
   _request: Request,
@@ -9,7 +10,9 @@ export async function GET(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { data: scan, error } = await supabase
+  const admin = createAdminClient();
+
+  const { data: scan, error } = await admin
     .from('scans')
     .select('*')
     .eq('id', params.id)
@@ -22,7 +25,7 @@ export async function GET(
     : 0;
 
   // Get failed jobs count
-  const { count: failedCount } = await supabase
+  const { count: failedCount } = await admin
     .from('job_queue')
     .select('*', { count: 'exact', head: true })
     .eq('scan_id', params.id)

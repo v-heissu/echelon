@@ -10,13 +10,14 @@ export async function PUT(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { data: profile } = await supabase.from('users').select('role').eq('id', user.id).single();
+  const admin = createAdminClient();
+
+  const { data: profile } = await admin.from('users').select('role').eq('id', user.id).single();
   if (profile?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const body = await request.json();
-  const adminClient = createAdminClient();
 
-  const { data: updated, error } = await adminClient
+  const { data: updated, error } = await admin
     .from('users')
     .update({ display_name: body.display_name })
     .eq('id', params.id)
@@ -36,16 +37,16 @@ export async function DELETE(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { data: profile } = await supabase.from('users').select('role').eq('id', user.id).single();
+  const admin = createAdminClient();
+
+  const { data: profile } = await admin.from('users').select('role').eq('id', user.id).single();
   if (profile?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
-  const adminClient = createAdminClient();
-
   // Delete profile first
-  await adminClient.from('users').delete().eq('id', params.id);
+  await admin.from('users').delete().eq('id', params.id);
 
   // Delete auth user
-  const { error } = await adminClient.auth.admin.deleteUser(params.id);
+  const { error } = await admin.auth.admin.deleteUser(params.id);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 

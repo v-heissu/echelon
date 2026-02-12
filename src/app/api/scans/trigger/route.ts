@@ -7,15 +7,15 @@ export async function POST(request: Request) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { data: profile } = await supabase.from('users').select('role').eq('id', user.id).single();
+  const admin = createAdminClient();
+
+  const { data: profile } = await admin.from('users').select('role').eq('id', user.id).single();
   if (profile?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const { project_slug } = await request.json();
 
-  const adminClient = createAdminClient();
-
   // Get project
-  const { data: project, error: projectError } = await adminClient
+  const { data: project, error: projectError } = await admin
     .from('projects')
     .select('*')
     .eq('slug', project_slug)
@@ -35,7 +35,7 @@ export async function POST(request: Request) {
   const totalTasks = keywords.length * sources.length;
 
   // Create scan
-  const { data: scan, error: scanError } = await adminClient
+  const { data: scan, error: scanError } = await admin
     .from('scans')
     .insert({
       project_id: project.id,
@@ -62,7 +62,7 @@ export async function POST(request: Request) {
     }))
   );
 
-  await adminClient.from('job_queue').insert(jobs);
+  await admin.from('job_queue').insert(jobs);
 
   // Trigger worker
   const baseUrl = new URL(request.url).origin;
