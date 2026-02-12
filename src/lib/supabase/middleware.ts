@@ -38,18 +38,19 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Redirect authenticated users away from login
+  // Redirect authenticated users away from login (only if profile exists)
   if (user && pathname.startsWith('/login')) {
-    const url = request.nextUrl.clone();
-    // Check role to redirect appropriately
     const { data: profile } = await supabase
       .from('users')
       .select('role')
       .eq('id', user.id)
       .single();
 
-    url.pathname = profile?.role === 'admin' ? '/admin' : '/';
-    return NextResponse.redirect(url);
+    if (profile) {
+      const url = request.nextUrl.clone();
+      url.pathname = profile.role === 'admin' ? '/admin' : '/';
+      return NextResponse.redirect(url);
+    }
   }
 
   // Protect admin routes
