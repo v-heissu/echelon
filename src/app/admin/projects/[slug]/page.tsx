@@ -94,9 +94,16 @@ export default function EditProjectPage() {
   async function handleDelete() {
     if (!confirm('Eliminare il progetto? Tutti i dati saranno persi.')) return;
 
-    const res = await fetch(`/api/admin/projects/${slug}`, { method: 'DELETE' });
-    if (res.ok) {
-      router.push('/admin/projects');
+    try {
+      const res = await fetch(`/api/admin/projects/${slug}`, { method: 'DELETE' });
+      if (res.ok) {
+        router.push('/admin/projects');
+      } else {
+        const data = await res.json();
+        alert('Errore eliminazione: ' + data.error);
+      }
+    } catch {
+      alert('Errore di rete durante l\'eliminazione.');
     }
   }
 

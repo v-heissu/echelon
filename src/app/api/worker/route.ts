@@ -16,20 +16,33 @@ export async function POST(request: Request) {
 
   const supabase = createAdminClient();
 
-  // Optimistic lock: grab one pending task
-  const { data: job, error: jobError } = await supabase
+  // 1. Find the oldest pending job
+  const { data: pendingJob } = await supabase
     .from('job_queue')
-    .update({ status: 'processing', started_at: new Date().toISOString() })
+    .select('id')
     .eq('status', 'pending')
     .order('created_at', { ascending: true })
     .limit(1)
+    .single();
+
+  if (!pendingJob) {
+    // No more tasks — check if scan is complete
+    await checkAndCompleteScans(supabase);
+    return NextResponse.json({ message: 'No pending tasks' });
+  }
+
+  // 2. Claim the job (optimistic lock: only update if still pending)
+  const { data: job, error: jobError } = await supabase
+    .from('job_queue')
+    .update({ status: 'processing', started_at: new Date().toISOString() })
+    .eq('id', pendingJob.id)
+    .eq('status', 'pending')
     .select()
     .single();
 
   if (jobError || !job) {
-    // No more tasks — check if scan is complete
-    await checkAndCompleteScans(supabase);
-    return NextResponse.json({ message: 'No pending tasks' });
+    // Another worker already claimed this job
+    return NextResponse.json({ message: 'Job already claimed' });
   }
 
   try {
@@ -155,16 +168,22 @@ export async function POST(request: Request) {
     // Update scan progress
     await supabase.rpc('increment_scan_progress', { scan_uuid: job.scan_id });
 
-    // 6. Trigger next task (non-blocking)
-    const baseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-      ? new URL(request.url).origin
-      : 'http://localhost:3000';
-
-    fetch(`${baseUrl}/api/worker`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ secret: process.env.WORKER_SECRET }),
-    }).catch(() => {}); // Fire and forget
+    // 6. Trigger next task
+    const baseUrl = new URL(request.url).origin;
+    const nextController = new AbortController();
+    const nextTimeout = setTimeout(() => nextController.abort(), 3000);
+    try {
+      await fetch(`${baseUrl}/api/worker`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ secret: process.env.WORKER_SECRET }),
+        signal: nextController.signal,
+      });
+    } catch {
+      // Timeout or error - next worker invocation handles it
+    } finally {
+      clearTimeout(nextTimeout);
+    }
 
     return NextResponse.json({ message: 'Task completed', job_id: job.id });
   } catch (error) {
@@ -196,11 +215,20 @@ export async function POST(request: Request) {
 
     // Trigger next task even on failure
     const baseUrl = new URL(request.url).origin;
-    fetch(`${baseUrl}/api/worker`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ secret: process.env.WORKER_SECRET }),
-    }).catch(() => {});
+    const errController = new AbortController();
+    const errTimeout = setTimeout(() => errController.abort(), 3000);
+    try {
+      await fetch(`${baseUrl}/api/worker`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ secret: process.env.WORKER_SECRET }),
+        signal: errController.signal,
+      });
+    } catch {
+      // Timeout or error
+    } finally {
+      clearTimeout(errTimeout);
+    }
 
     return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
