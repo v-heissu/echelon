@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 export async function POST(request: Request) {
@@ -42,7 +43,21 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'Existing user promoted to admin and password synced', id: userId });
     }
 
-    return NextResponse.json({ message: 'Admin already exists, password synced' });
+    // Verify login works server-side
+    const anonClient = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+    const { error: loginErr } = await anonClient.auth.signInWithPassword({
+      email: adminEmail,
+      password: adminPassword,
+    });
+
+    return NextResponse.json({
+      message: 'Admin already exists, password synced',
+      loginTest: loginErr ? `FAILED: ${loginErr.message}` : 'OK',
+      emailHint: `${adminEmail.substring(0, 4)}***@${adminEmail.split('@')[1]}`,
+    });
   }
 
   // Create auth user
