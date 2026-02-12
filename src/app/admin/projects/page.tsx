@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
-import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -13,13 +12,17 @@ export default function ProjectsPage() {
   const [projects, setProjects] = useState<(Project & { scans: { status: string; completed_at: string }[] })[]>([]);
   const [loading, setLoading] = useState(true);
   const loadProjects = useCallback(async () => {
-    const supabase = createClient();
-    const { data } = await supabase
-      .from('projects')
-      .select('*, scans(id, status, completed_at)')
-      .order('created_at', { ascending: false });
-    setProjects((data as typeof projects) || []);
-    setLoading(false);
+    try {
+      const res = await fetch('/api/admin/projects');
+      if (res.ok) {
+        const data = await res.json();
+        setProjects(data || []);
+      }
+    } catch {
+      // Network error
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {

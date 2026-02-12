@@ -141,11 +141,18 @@ export default function NewProjectPage() {
 
       // Automatically trigger first scan if keywords are configured
       if (keywords.length > 0) {
-        await fetch('/api/scans/trigger', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ project_slug: project.slug }),
-        });
+        try {
+          const scanRes = await fetch('/api/scans/trigger', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ project_slug: project.slug }),
+          });
+          if (!scanRes.ok) {
+            console.error('Scan trigger failed:', await scanRes.json());
+          }
+        } catch {
+          console.error('Scan trigger network error');
+        }
       }
 
       router.push(`/project/${project.slug}`);

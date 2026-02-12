@@ -23,7 +23,7 @@ export async function POST(request: Request) {
     .eq('status', 'pending')
     .order('created_at', { ascending: true })
     .limit(1)
-    .select('*, scans(project_id, projects(industry, competitors, language, location_code))')
+    .select()
     .single();
 
   if (jobError || !job) {
@@ -33,11 +33,32 @@ export async function POST(request: Request) {
   }
 
   try {
-    const project = (job.scans as Record<string, unknown>)?.projects as Record<string, unknown>;
-    const industry = (project?.industry as string) || '';
-    const competitors = (project?.competitors as string[]) || [];
-    const language = (project?.language as string) || 'it';
-    const locationCode = (project?.location_code as number) || 2380;
+    // Fetch project settings via separate queries for reliability
+    const { data: scan } = await supabase
+      .from('scans')
+      .select('project_id')
+      .eq('id', job.scan_id)
+      .single();
+
+    let industry = '';
+    let competitors: string[] = [];
+    let language = 'it';
+    let locationCode = 2380;
+
+    if (scan) {
+      const { data: proj } = await supabase
+        .from('projects')
+        .select('industry, competitors, language, location_code')
+        .eq('id', scan.project_id)
+        .single();
+
+      if (proj) {
+        industry = (proj.industry as string) || '';
+        competitors = (proj.competitors as string[]) || [];
+        language = (proj.language as string) || 'it';
+        locationCode = (proj.location_code as number) || 2380;
+      }
+    }
 
     // 1. Fetch SERP data
     const dataforseo = new DataForSEOClient();
@@ -116,15 +137,9 @@ export async function POST(request: Request) {
 
         await supabase.from('ai_analysis').insert(analysisData);
 
-        // Update tags
-        const scanProject = await supabase
-          .from('scans')
-          .select('project_id')
-          .eq('id', job.scan_id)
-          .single();
-
-        if (scanProject.data) {
-          await updateTags(supabase, scanProject.data.project_id, analysis.results);
+        // Update tags (reuse scan data fetched earlier)
+        if (scan?.project_id) {
+          await updateTags(supabase, scan.project_id, analysis.results);
         }
       } catch (aiError) {
         console.error('AI analysis failed, continuing without analysis:', aiError);
