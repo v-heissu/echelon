@@ -34,5 +34,11 @@ export default async function Home() {
     redirect(`/project/${proj.slug}`);
   }
 
+  // No profile or no projects — redirect to admin if admin, otherwise stay
+  if (profile) {
+    redirect('/admin');
+  }
+
+  // User authenticated but no profile in users table — sign out to break loop
   redirect('/login');
 }
