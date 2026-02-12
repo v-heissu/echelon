@@ -1,13 +1,12 @@
 export const dynamic = 'force-dynamic';
 
 import { createAdminClient } from '@/lib/supabase/admin';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
-import { FolderOpen, Users, Activity, AlertCircle } from 'lucide-react';
+import { FolderOpen, Users, Activity, AlertCircle, ArrowRight } from 'lucide-react';
 
 export default async function AdminDashboard() {
-  // Middleware already verified admin access; use admin client to bypass RLS
   const supabase = createAdminClient();
 
   const [
@@ -32,82 +31,96 @@ export default async function AdminDashboard() {
   ]);
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold text-primary mb-6">Dashboard Admin</h1>
+    <div className="animate-fade-in-up">
+      <div className="mb-8">
+        <h1 className="text-2xl font-bold text-primary">Dashboard Admin</h1>
+        <p className="text-sm text-muted-foreground mt-1">Panoramica generale della piattaforma</p>
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <Card>
-          <CardContent className="p-6">
+        <Card className="border-0 shadow-md">
+          <CardContent className="p-5">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Progetti</p>
-                <p className="text-3xl font-bold text-primary">{projectCount || 0}</p>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Progetti</p>
+                <p className="text-3xl font-bold text-primary mt-1">{projectCount || 0}</p>
               </div>
-              <FolderOpen className="h-8 w-8 text-accent" />
+              <div className="w-12 h-12 rounded-xl bg-accent/10 flex items-center justify-center">
+                <FolderOpen className="h-6 w-6 text-accent" />
+              </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-6">
+        <Card className="border-0 shadow-md">
+          <CardContent className="p-5">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Utenti</p>
-                <p className="text-3xl font-bold text-primary">{userCount || 0}</p>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Utenti</p>
+                <p className="text-3xl font-bold text-primary mt-1">{userCount || 0}</p>
               </div>
-              <Users className="h-8 w-8 text-accent" />
+              <div className="w-12 h-12 rounded-xl bg-accent/10 flex items-center justify-center">
+                <Users className="h-6 w-6 text-accent" />
+              </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-6">
+        <Card className="border-0 shadow-md">
+          <CardContent className="p-5">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Scan Recenti</p>
-                <p className="text-3xl font-bold text-primary">{recentScans?.length || 0}</p>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Scan Recenti</p>
+                <p className="text-3xl font-bold text-primary mt-1">{recentScans?.length || 0}</p>
               </div>
-              <Activity className="h-8 w-8 text-teal" />
+              <div className="w-12 h-12 rounded-xl bg-teal/10 flex items-center justify-center">
+                <Activity className="h-6 w-6 text-teal" />
+              </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-6">
+        <Card className="border-0 shadow-md">
+          <CardContent className="p-5">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Job Falliti</p>
-                <p className="text-3xl font-bold text-destructive">{failedJobs?.length || 0}</p>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Job Falliti</p>
+                <p className="text-3xl font-bold text-destructive mt-1">{failedJobs?.length || 0}</p>
               </div>
-              <AlertCircle className="h-8 w-8 text-destructive" />
+              <div className="w-12 h-12 rounded-xl bg-destructive/10 flex items-center justify-center">
+                <AlertCircle className="h-6 w-6 text-destructive" />
+              </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Scan Recenti</CardTitle>
-          </CardHeader>
-          <CardContent>
+        <Card className="border-0 shadow-md">
+          <div className="p-5 pb-0 flex items-center justify-between">
+            <h3 className="font-semibold text-primary">Scan Recenti</h3>
+            <Link href="/admin/jobs" className="text-xs text-accent hover:underline flex items-center gap-1">
+              Vedi tutti <ArrowRight className="w-3 h-3" />
+            </Link>
+          </div>
+          <CardContent className="p-5">
             {recentScans && recentScans.length > 0 ? (
-              <div className="space-y-3">
+              <div className="space-y-1">
                 {recentScans.map((scan) => {
                   const project = scan.projects as { name: string; slug: string } | null;
                   return (
                     <div
                       key={scan.id}
-                      className="flex items-center justify-between py-2 border-b last:border-0"
+                      className="flex items-center justify-between py-3 px-3 rounded-lg hover:bg-muted/50 transition-colors"
                     >
                       <div>
                         <Link
                           href={`/project/${project?.slug}`}
-                          className="font-medium text-accent hover:underline"
+                          className="font-medium text-sm text-accent hover:underline"
                         >
                           {project?.name || 'Unknown'}
                         </Link>
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-xs text-muted-foreground mt-0.5">
                           {scan.trigger_type} — {scan.completed_tasks}/{scan.total_tasks} task
                         </p>
                       </div>
@@ -129,27 +142,30 @@ export default async function AdminDashboard() {
                 })}
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">Nessuna scan recente</p>
+              <p className="text-sm text-muted-foreground text-center py-6">Nessuna scan recente</p>
             )}
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Job Falliti</CardTitle>
-          </CardHeader>
-          <CardContent>
+        <Card className="border-0 shadow-md">
+          <div className="p-5 pb-0 flex items-center justify-between">
+            <h3 className="font-semibold text-primary">Job Falliti</h3>
+            <Link href="/admin/jobs" className="text-xs text-accent hover:underline flex items-center gap-1">
+              Vedi tutti <ArrowRight className="w-3 h-3" />
+            </Link>
+          </div>
+          <CardContent className="p-5">
             {failedJobs && failedJobs.length > 0 ? (
-              <div className="space-y-3">
+              <div className="space-y-1">
                 {failedJobs.map((job) => {
                   const scanProject = job.scans as { projects: { name: string } } | null;
                   return (
-                    <div key={job.id} className="py-2 border-b last:border-0">
+                    <div key={job.id} className="py-3 px-3 rounded-lg hover:bg-muted/50 transition-colors">
                       <div className="flex items-center justify-between">
                         <span className="font-medium text-sm">{job.keyword}</span>
                         <Badge variant="negative">{job.source}</Badge>
                       </div>
-                      <p className="text-xs text-muted-foreground mt-1">
+                      <p className="text-xs text-muted-foreground mt-0.5">
                         {scanProject?.projects?.name} — Tentativi: {job.retry_count}/3
                       </p>
                       {job.error_message && (
@@ -162,7 +178,12 @@ export default async function AdminDashboard() {
                 })}
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">Nessun job fallito</p>
+              <div className="text-center py-6">
+                <div className="w-10 h-10 rounded-xl bg-positive/10 flex items-center justify-center mx-auto mb-2">
+                  <Activity className="h-5 w-5 text-positive" />
+                </div>
+                <p className="text-sm text-muted-foreground">Nessun job fallito</p>
+              </div>
             )}
           </CardContent>
         </Card>

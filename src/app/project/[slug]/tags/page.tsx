@@ -2,14 +2,15 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tag } from '@/types/database';
+import { Card, CardContent } from '@/components/ui/card';
+import { Tag as TagType } from '@/types/database';
+import { Tag, Trophy } from 'lucide-react';
 
 export default function TagsPage() {
   const params = useParams();
   const slug = params.slug as string;
   const router = useRouter();
-  const [tags, setTags] = useState<Tag[]>([]);
+  const [tags, setTags] = useState<TagType[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -22,7 +23,12 @@ export default function TagsPage() {
   }, [slug]);
 
   if (loading) {
-    return <div className="h-64 bg-white rounded-lg animate-pulse" />;
+    return (
+      <div className="space-y-4 animate-fade-in-up">
+        <div className="h-8 w-36 rounded-lg animate-shimmer" />
+        <div className="h-64 rounded-xl animate-shimmer" />
+      </div>
+    );
   }
 
   const maxCount = Math.max(...tags.map((t) => t.count), 1);
@@ -32,14 +38,20 @@ export default function TagsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-primary">Tag Cloud</h1>
+    <div className="space-y-6 animate-fade-in-up">
+      <div>
+        <h1 className="text-2xl font-bold text-primary">Tag Cloud</h1>
+        <p className="text-sm text-muted-foreground mt-1">{tags.length} temi identificati</p>
+      </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Temi del Progetto</CardTitle>
-        </CardHeader>
-        <CardContent>
+      <Card className="border-0 shadow-md">
+        <CardContent className="p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-8 h-8 rounded-lg bg-teal/10 flex items-center justify-center">
+              <Tag className="w-4 h-4 text-teal" />
+            </div>
+            <h3 className="font-semibold text-primary">Temi del Progetto</h3>
+          </div>
           {tags.length > 0 ? (
             <div className="flex flex-wrap gap-2 justify-center py-6">
               {tags.map((tag) => {
@@ -51,7 +63,7 @@ export default function TagsPage() {
                   <button
                     key={tag.id}
                     onClick={() => handleTagClick(tag.name)}
-                    className="px-3 py-1.5 rounded-full bg-teal-light/20 text-teal hover:bg-teal-light/40 transition-colors cursor-pointer border border-teal-light/30"
+                    className="px-3 py-1.5 rounded-full bg-accent/10 text-accent hover:bg-accent/20 transition-all duration-200 cursor-pointer border border-accent/15 hover:shadow-sm"
                     style={{ fontSize, opacity }}
                   >
                     {tag.name}
@@ -61,23 +73,30 @@ export default function TagsPage() {
               })}
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground text-center py-8">
-              Nessun tag disponibile. Avvia una scan con analisi AI.
-            </p>
+            <div className="text-center py-12">
+              <div className="w-12 h-12 rounded-xl bg-teal/10 flex items-center justify-center mx-auto mb-3">
+                <Tag className="h-6 w-6 text-teal" />
+              </div>
+              <p className="text-sm text-muted-foreground">Nessun tag disponibile. Avvia una scan con analisi AI.</p>
+            </div>
           )}
         </CardContent>
       </Card>
 
       {tags.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Classifica Temi</CardTitle>
-          </CardHeader>
-          <CardContent>
+        <Card className="border-0 shadow-md">
+          <CardContent className="p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-8 h-8 rounded-lg bg-gold/10 flex items-center justify-center">
+                <Trophy className="w-4 h-4 text-gold" />
+              </div>
+              <h3 className="font-semibold text-primary">Classifica Temi</h3>
+              <span className="text-xs text-muted-foreground">(Top 20)</span>
+            </div>
             <div className="space-y-2">
               {tags.slice(0, 20).map((tag, idx) => (
-                <div key={tag.id} className="flex items-center gap-3">
-                  <span className="text-sm font-mono text-muted-foreground w-6 text-right">
+                <div key={tag.id} className="flex items-center gap-3 py-1">
+                  <span className="text-xs font-mono text-muted-foreground w-6 text-right">
                     {idx + 1}
                   </span>
                   <div className="flex-1">
@@ -88,11 +107,11 @@ export default function TagsPage() {
                       >
                         {tag.name}
                       </button>
-                      <span className="text-xs text-muted-foreground">{tag.count}</span>
+                      <span className="text-xs text-muted-foreground font-mono">{tag.count}</span>
                     </div>
                     <div className="w-full bg-muted rounded-full h-1.5">
                       <div
-                        className="bg-accent rounded-full h-1.5 transition-all"
+                        className="bg-gradient-to-r from-accent to-teal rounded-full h-1.5 transition-all duration-500"
                         style={{ width: `${(tag.count / maxCount) * 100}%` }}
                       />
                     </div>

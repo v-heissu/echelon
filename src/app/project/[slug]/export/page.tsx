@@ -5,20 +5,19 @@ import { useParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Download, FileSpreadsheet } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Download, FileSpreadsheet, Loader2 } from 'lucide-react';
 
 export default function ExportPage() {
   const params = useParams();
   const slug = params.slug as string;
-  const supabase = createClient();
-
   const [scans, setScans] = useState<{ id: string; completed_at: string }[]>([]);
   const [selectedScan, setSelectedScan] = useState('');
   const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
     async function loadScans() {
+      const supabase = createClient();
       const { data: project } = await supabase
         .from('projects')
         .select('id')
@@ -62,23 +61,27 @@ export default function ExportPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-primary">Export Dati</h1>
+    <div className="space-y-6 animate-fade-in-up">
+      <div>
+        <h1 className="text-2xl font-bold text-primary">Export Dati</h1>
+        <p className="text-sm text-muted-foreground mt-1">Scarica i dati in formato Excel</p>
+      </div>
 
-      <Card className="max-w-lg">
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <FileSpreadsheet className="h-5 w-5 text-accent" />
-            Export Excel
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            Genera un file Excel con tre fogli: Risultati, Trend Summary e Competitor Analysis.
-          </p>
+      <Card className="max-w-lg border-0 shadow-md overflow-hidden">
+        <div className="h-1 bg-gradient-to-r from-accent to-teal" />
+        <CardContent className="p-6 space-y-5">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-xl bg-accent/10 flex items-center justify-center">
+              <FileSpreadsheet className="h-6 w-6 text-accent" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-primary">Export Excel</h3>
+              <p className="text-xs text-muted-foreground">Risultati, Trend Summary e Competitor Analysis</p>
+            </div>
+          </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1">Scan (opzionale)</label>
+            <label className="block text-xs font-medium text-muted-foreground mb-1.5">Scan (opzionale)</label>
             <Select
               value={selectedScan}
               onChange={(e) => setSelectedScan(e.target.value)}
@@ -100,10 +103,19 @@ export default function ExportPage() {
             variant="accent"
             onClick={handleExport}
             disabled={downloading}
-            className="w-full"
+            className="w-full h-11 gap-2 font-semibold"
           >
-            <Download className="h-4 w-4 mr-2" />
-            {downloading ? 'Download in corso...' : 'Scarica Excel'}
+            {downloading ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Download in corso...
+              </>
+            ) : (
+              <>
+                <Download className="h-4 w-4" />
+                Scarica Excel
+              </>
+            )}
           </Button>
         </CardContent>
       </Card>

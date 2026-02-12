@@ -2,9 +2,10 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { ResultsTable } from '@/components/dashboard/results-table';
 import { SerpResultWithAnalysis } from '@/types/database';
+import { Building2, List } from 'lucide-react';
 
 export default function CompetitorsPage() {
   const params = useParams();
@@ -56,31 +57,48 @@ export default function CompetitorsPage() {
     .sort((a, b) => b.count - a.count);
 
   if (loading) {
-    return <div className="h-64 bg-white rounded-lg animate-pulse" />;
+    return (
+      <div className="space-y-4 animate-fade-in-up">
+        <div className="h-8 w-48 rounded-lg animate-shimmer" />
+        <div className="grid grid-cols-3 gap-4">
+          {[1, 2, 3].map((i) => <div key={i} className="h-28 rounded-xl animate-shimmer" />)}
+        </div>
+        <div className="h-64 rounded-xl animate-shimmer" />
+      </div>
+    );
   }
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-primary">Vista Competitor</h1>
+    <div className="space-y-6 animate-fade-in-up">
+      <div>
+        <h1 className="text-2xl font-bold text-primary">Vista Competitor</h1>
+        <p className="text-sm text-muted-foreground mt-1">{competitorStats.length} competitor rilevati</p>
+      </div>
 
       {competitorStats.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {competitorStats.map((comp) => (
-            <Card key={comp.domain}>
+            <Card key={comp.domain} className="border-0 shadow-md overflow-hidden">
+              <div className="h-1 bg-gradient-to-r from-orange to-gold" />
               <CardContent className="p-5">
-                <h3 className="font-medium text-sm text-orange truncate">{comp.domain}</h3>
-                <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-                  <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-7 h-7 rounded-md bg-orange/10 flex items-center justify-center">
+                    <Building2 className="w-3.5 h-3.5 text-orange" />
+                  </div>
+                  <h3 className="font-semibold text-sm text-primary truncate">{comp.domain}</h3>
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div className="p-2 rounded-lg bg-muted/50">
                     <p className="text-xl font-bold text-primary">{comp.count}</p>
-                    <p className="text-xs text-muted-foreground">Menzioni</p>
+                    <p className="text-[10px] text-muted-foreground font-medium">Menzioni</p>
                   </div>
-                  <div>
+                  <div className="p-2 rounded-lg bg-muted/50">
                     <p className="text-xl font-bold text-primary">{comp.keywords}</p>
-                    <p className="text-xs text-muted-foreground">Keywords</p>
+                    <p className="text-[10px] text-muted-foreground font-medium">Keywords</p>
                   </div>
-                  <div>
+                  <div className="p-2 rounded-lg bg-muted/50">
                     <p className="text-xl font-bold text-primary">{comp.avgPosition.toFixed(1)}</p>
-                    <p className="text-xs text-muted-foreground">Pos. Media</p>
+                    <p className="text-[10px] text-muted-foreground font-medium">Pos. Media</p>
                   </div>
                 </div>
               </CardContent>
@@ -89,19 +107,28 @@ export default function CompetitorsPage() {
         </div>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Risultati Competitor</CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
+      <Card className="border-0 shadow-md overflow-hidden">
+        <div className="p-5 pb-0">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-orange/10 flex items-center justify-center">
+              <List className="w-4 h-4 text-orange" />
+            </div>
+            <h3 className="font-semibold text-primary">Risultati Competitor</h3>
+          </div>
+        </div>
+        <CardContent className="p-0 mt-3">
           <ResultsTable results={results} />
         </CardContent>
       </Card>
 
       {results.length === 0 && (
-        <Card>
-          <CardContent className="p-12 text-center text-muted-foreground">
-            Nessun competitor trovato. Configura i competitor nel progetto.
+        <Card className="border-0 shadow-md">
+          <CardContent className="p-16 text-center">
+            <div className="w-16 h-16 rounded-2xl bg-orange/10 flex items-center justify-center mx-auto mb-4">
+              <Building2 className="h-8 w-8 text-orange" />
+            </div>
+            <h3 className="text-lg font-semibold text-primary mb-1">Nessun competitor trovato</h3>
+            <p className="text-sm text-muted-foreground">Configura i competitor nel progetto per iniziare.</p>
           </CardContent>
         </Card>
       )}
