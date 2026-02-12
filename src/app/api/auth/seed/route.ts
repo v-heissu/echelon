@@ -57,6 +57,7 @@ export async function POST(request: Request) {
       message: 'Admin already exists, password synced',
       loginTest: loginErr ? `FAILED: ${loginErr.message}` : 'OK',
       emailHint: `${adminEmail.substring(0, 4)}***@${adminEmail.split('@')[1]}`,
+      supabaseProject: process.env.NEXT_PUBLIC_SUPABASE_URL?.replace('https://', '').split('.')[0],
     });
   }
 
