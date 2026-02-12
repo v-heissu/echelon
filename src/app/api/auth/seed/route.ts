@@ -25,16 +25,24 @@ export async function POST(request: Request) {
     .limit(1);
 
   if (existingUsers && existingUsers.length > 0) {
+    const userId = existingUsers[0].id;
+
+    // Always sync password with env var
+    await supabase.auth.admin.updateUserById(userId, {
+      password: adminPassword,
+      email_confirm: true,
+    });
+
     // Profile exists but might not be admin (e.g. trigger created it as client)
-    if (existingUsers[0].role === 'admin') {
-      return NextResponse.json({ message: 'Admin already exists' });
+    if (existingUsers[0].role !== 'admin') {
+      await supabase
+        .from('users')
+        .update({ role: 'admin', display_name: 'Admin' })
+        .eq('id', userId);
+      return NextResponse.json({ message: 'Existing user promoted to admin and password synced', id: userId });
     }
-    // Promote to admin
-    await supabase
-      .from('users')
-      .update({ role: 'admin', display_name: 'Admin' })
-      .eq('id', existingUsers[0].id);
-    return NextResponse.json({ message: 'Existing user promoted to admin', id: existingUsers[0].id });
+
+    return NextResponse.json({ message: 'Admin already exists, password synced' });
   }
 
   // Create auth user
