@@ -11,14 +11,13 @@ import { Download, FileSpreadsheet, Loader2 } from 'lucide-react';
 export default function ExportPage() {
   const params = useParams();
   const slug = params.slug as string;
-  const supabase = createClient();
-
   const [scans, setScans] = useState<{ id: string; completed_at: string }[]>([]);
   const [selectedScan, setSelectedScan] = useState('');
   const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
     async function loadScans() {
+      const supabase = createClient();
       const { data: project } = await supabase
         .from('projects')
         .select('id')

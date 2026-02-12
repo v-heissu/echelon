@@ -19,23 +19,21 @@ import { Clock, Loader2, CheckCircle2, XCircle } from 'lucide-react';
 export default function JobsPage() {
   const [jobs, setJobs] = useState<(JobQueue & { scans: { projects: { name: string } } })[]>([]);
   const [loading, setLoading] = useState(true);
-  const supabase = createClient();
-
   useEffect(() => {
+    const supabase = createClient();
+    async function loadJobs() {
+      const { data } = await supabase
+        .from('job_queue')
+        .select('*, scans(projects(name))')
+        .order('created_at', { ascending: false })
+        .limit(100);
+      setJobs((data as typeof jobs) || []);
+      setLoading(false);
+    }
     loadJobs();
     const interval = setInterval(loadJobs, 10000);
     return () => clearInterval(interval);
   }, []);
-
-  async function loadJobs() {
-    const { data } = await supabase
-      .from('job_queue')
-      .select('*, scans(projects(name))')
-      .order('created_at', { ascending: false })
-      .limit(100);
-    setJobs((data as typeof jobs) || []);
-    setLoading(false);
-  }
 
   const statusVariant = (status: string) => {
     switch (status) {

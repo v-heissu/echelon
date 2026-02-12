@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -12,20 +12,19 @@ import { Project } from '@/types/database';
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<(Project & { scans: { status: string; completed_at: string }[] })[]>([]);
   const [loading, setLoading] = useState(true);
-  const supabase = createClient();
-
-  useEffect(() => {
-    loadProjects();
-  }, []);
-
-  async function loadProjects() {
+  const loadProjects = useCallback(async () => {
+    const supabase = createClient();
     const { data } = await supabase
       .from('projects')
       .select('*, scans(id, status, completed_at)')
       .order('created_at', { ascending: false });
     setProjects((data as typeof projects) || []);
     setLoading(false);
-  }
+  }, []);
+
+  useEffect(() => {
+    loadProjects();
+  }, [loadProjects]);
 
   async function triggerScan(slug: string) {
     const res = await fetch('/api/scans/trigger', {

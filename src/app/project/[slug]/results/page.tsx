@@ -9,13 +9,11 @@ import { Select } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
 import { ResultsTable } from '@/components/dashboard/results-table';
 import { SerpResultWithAnalysis } from '@/types/database';
-import { ChevronLeft, ChevronRight, Filter, List } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Filter } from 'lucide-react';
 
 export default function ResultsPage() {
   const params = useParams();
   const slug = params.slug as string;
-  const supabase = createClient();
-
   const [results, setResults] = useState<SerpResultWithAnalysis[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -64,6 +62,7 @@ export default function ResultsPage() {
 
   useEffect(() => {
     async function loadScans() {
+      const supabase = createClient();
       const { data: project } = await supabase
         .from('projects')
         .select('id')

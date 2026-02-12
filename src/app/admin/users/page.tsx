@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
@@ -30,17 +30,17 @@ export default function UsersPage() {
   const [tempPassword, setTempPassword] = useState('');
   const [copied, setCopied] = useState(false);
 
-  useEffect(() => {
-    loadUsers();
-  }, []);
-
-  async function loadUsers() {
+  const loadUsers = useCallback(async () => {
     const res = await fetch('/api/admin/users');
     if (res.ok) {
       setUsers(await res.json());
     }
     setLoading(false);
-  }
+  }, []);
+
+  useEffect(() => {
+    loadUsers();
+  }, [loadUsers]);
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();

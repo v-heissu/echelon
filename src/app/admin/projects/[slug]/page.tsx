@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -34,12 +34,7 @@ export default function EditProjectPage() {
     is_active: true,
   });
 
-  useEffect(() => {
-    loadProject();
-    loadAllUsers();
-  }, [slug]);
-
-  async function loadProject() {
+  const loadProject = useCallback(async () => {
     const res = await fetch(`/api/admin/projects/${slug}`);
     if (res.ok) {
       const data = await res.json();
@@ -58,15 +53,20 @@ export default function EditProjectPage() {
       });
     }
     setLoading(false);
-  }
+  }, [slug]);
 
-  async function loadAllUsers() {
+  const loadAllUsers = useCallback(async () => {
     const res = await fetch('/api/admin/users');
     if (res.ok) {
       const data = await res.json();
       setAllUsers(data.filter((u: User) => u.role === 'client'));
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    loadProject();
+    loadAllUsers();
+  }, [loadProject, loadAllUsers]);
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
