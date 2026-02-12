@@ -34,7 +34,22 @@ export async function POST(request: Request) {
   if (profile?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const body = await request.json();
-  const slug = slugify(body.name);
+  let slug = slugify(body.name);
+
+  // Ensure unique slug by checking for existing ones and appending a suffix
+  const { data: existing } = await admin
+    .from('projects')
+    .select('slug')
+    .like('slug', `${slug}%`);
+
+  if (existing && existing.length > 0) {
+    const taken = new Set(existing.map((p) => p.slug));
+    if (taken.has(slug)) {
+      let suffix = 2;
+      while (taken.has(`${slug}-${suffix}`)) suffix++;
+      slug = `${slug}-${suffix}`;
+    }
+  }
 
   const { data: project, error } = await admin
     .from('projects')
