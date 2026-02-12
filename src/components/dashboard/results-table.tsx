@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
+import { ChevronDown, ChevronUp, ExternalLink, Sparkles } from 'lucide-react';
 import { SerpResultWithAnalysis, Sentiment } from '@/types/database';
 import { truncate } from '@/lib/utils';
 
@@ -52,7 +52,7 @@ export function ResultsTable({ results, onTagClick }: ResultsTableProps) {
   };
 
   return (
-    <div className="bg-white rounded-lg border border-border overflow-hidden">
+    <div className="bg-white rounded-xl border-0 shadow-md overflow-hidden">
       <Table>
         <TableHeader>
           <TableRow>
@@ -83,9 +83,9 @@ export function ResultsTable({ results, onTagClick }: ResultsTableProps) {
               <>
                 <TableRow
                   key={result.id}
-                  className={result.is_competitor ? 'border-l-4 border-l-orange' : ''}
+                  className={`hover:bg-muted/30 transition-colors ${result.is_competitor ? 'border-l-4 border-l-orange' : ''}`}
                 >
-                  <TableCell className="font-mono text-sm">{result.position}</TableCell>
+                  <TableCell className="font-mono text-sm text-muted-foreground">{result.position}</TableCell>
                   <TableCell>
                     <a
                       href={result.url}
@@ -94,10 +94,10 @@ export function ResultsTable({ results, onTagClick }: ResultsTableProps) {
                       className="text-accent hover:underline text-sm flex items-center gap-1"
                     >
                       {truncate(result.title, 60)}
-                      <ExternalLink className="h-3 w-3 flex-shrink-0" />
+                      <ExternalLink className="h-3 w-3 flex-shrink-0 opacity-50" />
                     </a>
                   </TableCell>
-                  <TableCell className="text-xs">{result.domain}</TableCell>
+                  <TableCell className="text-xs text-muted-foreground">{result.domain}</TableCell>
                   <TableCell className="text-xs">{result.keyword}</TableCell>
                   <TableCell>
                     <Badge variant="outline" className="text-xs">
@@ -116,7 +116,7 @@ export function ResultsTable({ results, onTagClick }: ResultsTableProps) {
                       {analysis?.themes?.slice(0, 2).map((t) => (
                         <span
                           key={t.name}
-                          className="inline-block bg-teal-light/20 text-teal text-xs px-1.5 py-0.5 rounded cursor-pointer hover:bg-teal-light/40"
+                          className="inline-block bg-accent/10 text-accent text-xs px-2 py-0.5 rounded-full cursor-pointer hover:bg-accent/20 transition-colors font-medium"
                           onClick={() => onTagClick?.(t.name)}
                         >
                           {t.name}
@@ -128,7 +128,7 @@ export function ResultsTable({ results, onTagClick }: ResultsTableProps) {
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-6 w-6"
+                      className="h-7 w-7"
                       onClick={() => setExpandedId(isExpanded ? null : result.id)}
                     >
                       {isExpanded ? (
@@ -142,29 +142,32 @@ export function ResultsTable({ results, onTagClick }: ResultsTableProps) {
 
                 {isExpanded && (
                   <TableRow key={`${result.id}-expanded`}>
-                    <TableCell colSpan={8} className="bg-muted/50 p-4">
-                      <div className="space-y-3 text-sm">
+                    <TableCell colSpan={8} className="bg-muted/30 p-5">
+                      <div className="space-y-4 text-sm animate-fade-in-up">
                         {analysis?.summary && (
                           <div>
-                            <span className="font-medium">Sommario AI:</span>
-                            <p className="text-muted-foreground mt-1">{analysis.summary}</p>
+                            <div className="flex items-center gap-1.5 mb-1.5">
+                              <Sparkles className="w-3.5 h-3.5 text-accent" />
+                              <span className="font-semibold text-primary text-xs uppercase tracking-wide">Sommario AI</span>
+                            </div>
+                            <p className="text-muted-foreground leading-relaxed">{analysis.summary}</p>
                           </div>
                         )}
                         {result.excerpt && (
                           <div>
-                            <span className="font-medium">Excerpt:</span>
-                            <p className="text-muted-foreground mt-1 line-clamp-4">
+                            <span className="font-semibold text-primary text-xs uppercase tracking-wide">Excerpt</span>
+                            <p className="text-muted-foreground mt-1 line-clamp-4 leading-relaxed">
                               {result.excerpt}
                             </p>
                           </div>
                         )}
                         {analysis?.entities && analysis.entities.length > 0 && (
                           <div>
-                            <span className="font-medium">Entità:</span>
-                            <div className="flex gap-1 flex-wrap mt-1">
+                            <span className="font-semibold text-primary text-xs uppercase tracking-wide">Entita</span>
+                            <div className="flex gap-1.5 flex-wrap mt-1.5">
                               {analysis.entities.map((e, i) => (
                                 <Badge key={i} variant="outline" className="text-xs">
-                                  {e.name} ({e.type})
+                                  {e.name} <span className="text-muted-foreground ml-0.5">({e.type})</span>
                                 </Badge>
                               ))}
                             </div>
@@ -172,12 +175,12 @@ export function ResultsTable({ results, onTagClick }: ResultsTableProps) {
                         )}
                         {analysis?.themes && (
                           <div>
-                            <span className="font-medium">Tutti i temi:</span>
-                            <div className="flex gap-1 flex-wrap mt-1">
+                            <span className="font-semibold text-primary text-xs uppercase tracking-wide">Tutti i temi</span>
+                            <div className="flex gap-1.5 flex-wrap mt-1.5">
                               {analysis.themes.map((t) => (
                                 <span
                                   key={t.name}
-                                  className="inline-block bg-teal-light/20 text-teal text-xs px-2 py-1 rounded cursor-pointer hover:bg-teal-light/40"
+                                  className="inline-block bg-accent/10 text-accent text-xs px-2.5 py-1 rounded-full cursor-pointer hover:bg-accent/20 transition-colors font-medium"
                                   onClick={() => onTagClick?.(t.name)}
                                 >
                                   {t.name} ({(t.confidence * 100).toFixed(0)}%)
@@ -186,9 +189,9 @@ export function ResultsTable({ results, onTagClick }: ResultsTableProps) {
                             </div>
                           </div>
                         )}
-                        <div className="flex gap-4 text-xs text-muted-foreground">
-                          <span>Score: {analysis?.sentiment_score?.toFixed(2) || '—'}</span>
-                          <span>Lingua: {analysis?.language_detected || '—'}</span>
+                        <div className="flex gap-4 text-xs text-muted-foreground pt-1 border-t border-border/50">
+                          <span>Score: <strong>{analysis?.sentiment_score?.toFixed(2) || '—'}</strong></span>
+                          <span>Lingua: <strong>{analysis?.language_detected || '—'}</strong></span>
                         </div>
                       </div>
                     </TableCell>
@@ -201,7 +204,7 @@ export function ResultsTable({ results, onTagClick }: ResultsTableProps) {
       </Table>
 
       {results.length === 0 && (
-        <div className="p-8 text-center text-muted-foreground">
+        <div className="p-12 text-center text-muted-foreground">
           Nessun risultato trovato
         </div>
       )}

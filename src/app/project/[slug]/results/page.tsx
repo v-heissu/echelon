@@ -6,9 +6,10 @@ import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
+import { Card, CardContent } from '@/components/ui/card';
 import { ResultsTable } from '@/components/dashboard/results-table';
 import { SerpResultWithAnalysis } from '@/types/database';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Filter, List } from 'lucide-react';
 
 export default function ResultsPage() {
   const params = useParams();
@@ -86,88 +87,100 @@ export default function ResultsPage() {
   const totalPages = Math.ceil(total / 50);
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-2xl font-bold text-primary">Risultati</h1>
-
-      {/* Filters */}
-      <div className="flex flex-wrap gap-3 items-end bg-white p-4 rounded-lg border border-border">
-        <div>
-          <label className="block text-xs font-medium mb-1">Scan</label>
-          <Select
-            value={selectedScan}
-            onChange={(e) => { setSelectedScan(e.target.value); setPage(1); }}
-            className="w-[180px]"
-          >
-            <option value="">Tutte le scan</option>
-            {scans.map((s) => (
-              <option key={s.id} value={s.id}>
-                {new Date(s.completed_at).toLocaleDateString('it-IT')}
-              </option>
-            ))}
-          </Select>
-        </div>
-
-        <div>
-          <label className="block text-xs font-medium mb-1">Keyword</label>
-          <Input
-            value={keyword}
-            onChange={(e) => { setKeyword(e.target.value); setPage(1); }}
-            placeholder="Filtra..."
-            className="w-[150px]"
-          />
-        </div>
-
-        <div>
-          <label className="block text-xs font-medium mb-1">Source</label>
-          <Select
-            value={source}
-            onChange={(e) => { setSource(e.target.value); setPage(1); }}
-            className="w-[140px]"
-          >
-            <option value="">Tutte</option>
-            <option value="google_organic">Web</option>
-            <option value="google_news">News</option>
-          </Select>
-        </div>
-
-        <div>
-          <label className="block text-xs font-medium mb-1">Sentiment</label>
-          <Select
-            value={sentiment}
-            onChange={(e) => { setSentiment(e.target.value); setPage(1); }}
-            className="w-[130px]"
-          >
-            <option value="">Tutti</option>
-            <option value="positive">Positivo</option>
-            <option value="negative">Negativo</option>
-            <option value="neutral">Neutro</option>
-            <option value="mixed">Misto</option>
-          </Select>
-        </div>
-
-        <div>
-          <label className="block text-xs font-medium mb-1">Tag</label>
-          <Input
-            value={tagFilter}
-            onChange={(e) => { setTagFilter(e.target.value); setPage(1); }}
-            placeholder="Filtra tag..."
-            className="w-[130px]"
-          />
-        </div>
-
-        <div className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={competitorOnly}
-            onChange={(e) => { setCompetitorOnly(e.target.checked); setPage(1); }}
-            id="comp"
-          />
-          <label htmlFor="comp" className="text-xs font-medium">Solo Competitor</label>
-        </div>
+    <div className="space-y-5 animate-fade-in-up">
+      <div>
+        <h1 className="text-2xl font-bold text-primary">Risultati</h1>
+        <p className="text-sm text-muted-foreground mt-1">{total} risultati trovati</p>
       </div>
 
+      {/* Filters */}
+      <Card className="border-0 shadow-md">
+        <CardContent className="p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Filter className="w-4 h-4 text-muted-foreground" />
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Filtri</span>
+          </div>
+          <div className="flex flex-wrap gap-3 items-end">
+            <div>
+              <label className="block text-xs font-medium text-muted-foreground mb-1">Scan</label>
+              <Select
+                value={selectedScan}
+                onChange={(e) => { setSelectedScan(e.target.value); setPage(1); }}
+                className="w-[180px]"
+              >
+                <option value="">Tutte le scan</option>
+                {scans.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {new Date(s.completed_at).toLocaleDateString('it-IT')}
+                  </option>
+                ))}
+              </Select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-muted-foreground mb-1">Keyword</label>
+              <Input
+                value={keyword}
+                onChange={(e) => { setKeyword(e.target.value); setPage(1); }}
+                placeholder="Filtra..."
+                className="w-[150px]"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-muted-foreground mb-1">Source</label>
+              <Select
+                value={source}
+                onChange={(e) => { setSource(e.target.value); setPage(1); }}
+                className="w-[140px]"
+              >
+                <option value="">Tutte</option>
+                <option value="google_organic">Web</option>
+                <option value="google_news">News</option>
+              </Select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-muted-foreground mb-1">Sentiment</label>
+              <Select
+                value={sentiment}
+                onChange={(e) => { setSentiment(e.target.value); setPage(1); }}
+                className="w-[130px]"
+              >
+                <option value="">Tutti</option>
+                <option value="positive">Positivo</option>
+                <option value="negative">Negativo</option>
+                <option value="neutral">Neutro</option>
+                <option value="mixed">Misto</option>
+              </Select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-muted-foreground mb-1">Tag</label>
+              <Input
+                value={tagFilter}
+                onChange={(e) => { setTagFilter(e.target.value); setPage(1); }}
+                placeholder="Filtra tag..."
+                className="w-[130px]"
+              />
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => { setCompetitorOnly(!competitorOnly); setPage(1); }}
+                className={`relative w-9 h-5 rounded-full transition-colors duration-200 ${competitorOnly ? 'bg-accent' : 'bg-border'}`}
+              >
+                <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${competitorOnly ? 'left-4.5' : 'left-0.5'}`} />
+              </button>
+              <label className="text-xs font-medium text-muted-foreground">Solo Competitor</label>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {loading ? (
-        <div className="h-64 bg-white rounded-lg animate-pulse" />
+        <div className="h-64 rounded-xl animate-shimmer" />
       ) : (
         <>
           <ResultsTable
@@ -176,7 +189,7 @@ export default function ResultsPage() {
           />
 
           {totalPages > 1 && (
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between pt-2">
               <p className="text-sm text-muted-foreground">
                 {total} risultati — Pagina {page}/{totalPages}
               </p>
@@ -186,6 +199,7 @@ export default function ResultsPage() {
                   size="sm"
                   onClick={() => setPage(page - 1)}
                   disabled={page <= 1}
+                  className="gap-1"
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
@@ -194,6 +208,7 @@ export default function ResultsPage() {
                   size="sm"
                   onClick={() => setPage(page + 1)}
                   disabled={page >= totalPages}
+                  className="gap-1"
                 >
                   <ChevronRight className="h-4 w-4" />
                 </Button>

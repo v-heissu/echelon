@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
   LineChart,
@@ -46,13 +46,14 @@ export default function TrendsPage() {
   }, [slug]);
 
   if (loading) {
-    return <div className="animate-pulse space-y-4">
-      <div className="h-8 bg-white rounded w-48" />
-      <div className="h-96 bg-white rounded-lg" />
-    </div>;
+    return (
+      <div className="space-y-4 animate-fade-in-up">
+        <div className="h-8 w-48 rounded-lg animate-shimmer" />
+        <div className="h-96 rounded-xl animate-shimmer" />
+      </div>
+    );
   }
 
-  // Build timeline data for chart
   const top8 = trends.slice(0, 8);
   const allDates = new Set<string>();
   top8.forEach((t) => t.history.forEach((h) => allDates.add(h.date)));
@@ -88,22 +89,28 @@ export default function TrendsPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-primary">Trend Tematici</h1>
+    <div className="space-y-6 animate-fade-in-up">
+      <div>
+        <h1 className="text-2xl font-bold text-primary">Trend Tematici</h1>
+        <p className="text-sm text-muted-foreground mt-1">Analisi dell&apos;evoluzione dei temi nel tempo</p>
+      </div>
 
       {chartData.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Densità Tematica nel Tempo (Top 8)</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={400}>
+        <Card className="border-0 shadow-md">
+          <CardContent className="p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center">
+                <TrendingUp className="w-4 h-4 text-accent" />
+              </div>
+              <h3 className="font-semibold text-primary">Densita Tematica nel Tempo (Top 8)</h3>
+            </div>
+            <ResponsiveContainer width="100%" height={380}>
               <LineChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#B2B8C3" />
-                <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-                <YAxis tick={{ fontSize: 12 }} label={{ value: 'Densità %', angle: -90, position: 'insideLeft', style: { fontSize: 12 } }} />
-                <Tooltip />
-                <Legend />
+                <CartesianGrid strokeDasharray="3 3" stroke="#B2B8C3" strokeOpacity={0.5} />
+                <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#64748b' }} />
+                <YAxis tick={{ fontSize: 11, fill: '#64748b' }} label={{ value: 'Densita %', angle: -90, position: 'insideLeft', style: { fontSize: 11, fill: '#64748b' } }} />
+                <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', fontSize: '12px' }} />
+                <Legend wrapperStyle={{ fontSize: '12px' }} />
                 {top8.map((t, i) => (
                   <Line
                     key={t.theme}
@@ -120,16 +127,20 @@ export default function TrendsPage() {
         </Card>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Tutti i Temi</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
+      <Card className="border-0 shadow-md">
+        <CardContent className="p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-8 h-8 rounded-lg bg-gold/10 flex items-center justify-center">
+              <Sparkles className="w-4 h-4 text-gold" />
+            </div>
+            <h3 className="font-semibold text-primary">Tutti i Temi</h3>
+            <span className="text-xs text-muted-foreground">({trends.length})</span>
+          </div>
+          <div className="space-y-1">
             {trends.map((trend) => (
               <div
                 key={trend.theme}
-                className="flex items-center justify-between py-2 border-b last:border-0"
+                className="flex items-center justify-between py-3 px-3 rounded-lg hover:bg-muted/50 transition-colors"
               >
                 <div className="flex items-center gap-3">
                   {directionIcon(trend.direction)}
@@ -142,7 +153,7 @@ export default function TrendsPage() {
                 </div>
                 <div className="flex items-center gap-3">
                   <span className="text-xs text-muted-foreground">
-                    Densità: {(trend.current_density * 100).toFixed(1)}%
+                    Densita: {(trend.current_density * 100).toFixed(1)}%
                   </span>
                   <Badge
                     variant={
@@ -161,7 +172,7 @@ export default function TrendsPage() {
           </div>
 
           {trends.length === 0 && (
-            <p className="text-sm text-muted-foreground text-center py-4">
+            <p className="text-sm text-muted-foreground text-center py-8">
               Nessun trend disponibile. Avvia almeno una scan.
             </p>
           )}

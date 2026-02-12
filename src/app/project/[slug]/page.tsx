@@ -6,6 +6,7 @@ import { KPICards } from '@/components/dashboard/kpi-cards';
 import { SentimentChart } from '@/components/dashboard/sentiment-chart';
 import { DomainBarChart } from '@/components/dashboard/domain-bar-chart';
 import { ThemeBubbleChart } from '@/components/dashboard/theme-bubble-chart';
+import { BarChart3 } from 'lucide-react';
 
 interface DashboardData {
   kpi: { total_results: number; unique_domains: number; competitor_mentions: number; avg_sentiment: number };
@@ -48,15 +49,16 @@ export default function ProjectDashboard() {
 
   if (loading) {
     return (
-      <div className="space-y-4">
+      <div className="space-y-4 animate-fade-in-up">
+        <div className="h-8 w-36 rounded-lg animate-shimmer" />
         <div className="grid grid-cols-4 gap-4">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-24 bg-white rounded-lg animate-pulse" />
+            <div key={i} className="h-24 rounded-lg animate-shimmer" />
           ))}
         </div>
         <div className="grid grid-cols-2 gap-4">
-          <div className="h-80 bg-white rounded-lg animate-pulse" />
-          <div className="h-80 bg-white rounded-lg animate-pulse" />
+          <div className="h-80 rounded-lg animate-shimmer" />
+          <div className="h-80 rounded-lg animate-shimmer" />
         </div>
       </div>
     );
@@ -64,15 +66,22 @@ export default function ProjectDashboard() {
 
   if (!data) {
     return (
-      <div className="text-center py-12 text-muted-foreground">
-        Nessun dato disponibile. Avvia una scan per iniziare.
+      <div className="text-center py-20 animate-fade-in-up">
+        <div className="w-16 h-16 rounded-2xl bg-accent/10 flex items-center justify-center mx-auto mb-4">
+          <BarChart3 className="h-8 w-8 text-accent" />
+        </div>
+        <h3 className="text-lg font-semibold text-primary mb-1">Nessun dato disponibile</h3>
+        <p className="text-sm text-muted-foreground">Avvia una scan per iniziare il monitoraggio.</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-primary">Dashboard</h1>
+    <div className="space-y-6 animate-fade-in-up">
+      <div>
+        <h1 className="text-2xl font-bold text-primary">Dashboard</h1>
+        <p className="text-sm text-muted-foreground mt-1">Panoramica delle performance di monitoraggio</p>
+      </div>
 
       <KPICards kpi={data.kpi} delta={data.delta} />
 
