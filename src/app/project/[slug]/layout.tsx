@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import { createServerSupabase } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { ProjectSidebar } from '@/components/layout/project-sidebar';
 import { redirect } from 'next/navigation';
 
@@ -16,13 +17,16 @@ export default async function ProjectLayout({
 
   if (!user) redirect('/login');
 
-  const { data: project } = await supabase
+  // Use admin client for DB queries to avoid RLS/JWT propagation issues
+  const admin = createAdminClient();
+
+  const { data: project } = await admin
     .from('projects')
     .select('name')
     .eq('slug', params.slug)
     .single();
 
-  const { data: profile } = await supabase
+  const { data: profile } = await admin
     .from('users')
     .select('role')
     .eq('id', user.id)

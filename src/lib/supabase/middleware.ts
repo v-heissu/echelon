@@ -1,5 +1,14 @@
 import { createServerClient } from '@supabase/ssr';
+import { createClient } from '@supabase/supabase-js';
 import { NextResponse, type NextRequest } from 'next/server';
+
+function createMiddlewareAdmin() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  );
+}
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
@@ -38,9 +47,12 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  // Use admin client for profile lookups to avoid RLS/JWT propagation issues
+  const admin = createMiddlewareAdmin();
+
   // Redirect authenticated users away from login (only if profile exists)
   if (user && pathname.startsWith('/login')) {
-    const { data: profile } = await supabase
+    const { data: profile } = await admin
       .from('users')
       .select('role')
       .eq('id', user.id)
@@ -55,7 +67,7 @@ export async function updateSession(request: NextRequest) {
 
   // Protect admin routes
   if (user && pathname.startsWith('/admin')) {
-    const { data: profile } = await supabase
+    const { data: profile } = await admin
       .from('users')
       .select('role')
       .eq('id', user.id)
@@ -72,21 +84,21 @@ export async function updateSession(request: NextRequest) {
   if (user && pathname.startsWith('/project/')) {
     const slug = pathname.split('/')[2];
     if (slug) {
-      const { data: profile } = await supabase
+      const { data: profile } = await admin
         .from('users')
         .select('role')
         .eq('id', user.id)
         .single();
 
       if (profile?.role !== 'admin') {
-        const { data: project } = await supabase
+        const { data: project } = await admin
           .from('projects')
           .select('id')
           .eq('slug', slug)
           .single();
 
         if (project) {
-          const { data: membership } = await supabase
+          const { data: membership } = await admin
             .from('project_users')
             .select('user_id')
             .eq('project_id', project.id)
