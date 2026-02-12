@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 export async function GET(
   _request: Request,
@@ -9,7 +10,9 @@ export async function GET(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { data: project } = await supabase
+  const admin = createAdminClient();
+
+  const { data: project } = await admin
     .from('projects')
     .select('id')
     .eq('slug', params.slug)
@@ -17,7 +20,7 @@ export async function GET(
 
   if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 });
 
-  const { data: tags, error } = await supabase
+  const { data: tags, error } = await admin
     .from('tags')
     .select('*')
     .eq('project_id', project.id)

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { generateExcel } from '@/lib/export/excel';
 
 export async function GET(
@@ -10,10 +11,12 @@ export async function GET(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+  const admin = createAdminClient();
+
   const { searchParams } = new URL(request.url);
   const scanId = searchParams.get('scan_id');
 
-  const { data: project } = await supabase
+  const { data: project } = await admin
     .from('projects')
     .select('id, name, competitors')
     .eq('slug', params.slug)
@@ -22,7 +25,7 @@ export async function GET(
   if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 });
 
   // Get results
-  let query = supabase
+  let query = admin
     .from('serp_results')
     .select('*, ai_analysis(*), scans!inner(project_id, completed_at)')
     .eq('scans.project_id', project.id)

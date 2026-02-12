@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 export async function POST(
   request: Request,
@@ -9,12 +10,14 @@ export async function POST(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { data: profile } = await supabase.from('users').select('role').eq('id', user.id).single();
+  const admin = createAdminClient();
+
+  const { data: profile } = await admin.from('users').select('role').eq('id', user.id).single();
   if (profile?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const { user_id, role } = await request.json();
 
-  const { data: project } = await supabase
+  const { data: project } = await admin
     .from('projects')
     .select('id')
     .eq('slug', params.slug)
@@ -22,7 +25,7 @@ export async function POST(
 
   if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 });
 
-  const { error } = await supabase.from('project_users').insert({
+  const { error } = await admin.from('project_users').insert({
     project_id: project.id,
     user_id,
     role: role || 'viewer',
@@ -41,12 +44,14 @@ export async function DELETE(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { data: profile } = await supabase.from('users').select('role').eq('id', user.id).single();
+  const admin = createAdminClient();
+
+  const { data: profile } = await admin.from('users').select('role').eq('id', user.id).single();
   if (profile?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const { user_id } = await request.json();
 
-  const { data: project } = await supabase
+  const { data: project } = await admin
     .from('projects')
     .select('id')
     .eq('slug', params.slug)
@@ -54,7 +59,7 @@ export async function DELETE(
 
   if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 });
 
-  const { error } = await supabase
+  const { error } = await admin
     .from('project_users')
     .delete()
     .eq('project_id', project.id)

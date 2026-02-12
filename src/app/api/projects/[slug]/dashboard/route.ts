@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 export async function GET(
   _request: Request,
@@ -9,8 +10,10 @@ export async function GET(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+  const admin = createAdminClient();
+
   // Get project
-  const { data: project } = await supabase
+  const { data: project } = await admin
     .from('projects')
     .select('id')
     .eq('slug', params.slug)
@@ -19,7 +22,7 @@ export async function GET(
   if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 });
 
   // Get last 2 completed scans for delta comparison
-  const { data: scans } = await supabase
+  const { data: scans } = await admin
     .from('scans')
     .select('id, completed_at')
     .eq('project_id', project.id)
@@ -41,11 +44,11 @@ export async function GET(
   const previousScanId = scans.length > 1 ? scans[1].id : null;
 
   // Current scan KPIs
-  const currentKpi = await getScanKPIs(supabase, currentScanId);
-  const previousKpi = previousScanId ? await getScanKPIs(supabase, previousScanId) : null;
+  const currentKpi = await getScanKPIs(admin, currentScanId);
+  const previousKpi = previousScanId ? await getScanKPIs(admin, previousScanId) : null;
 
   // Sentiment distribution over time
-  const { data: allScans } = await supabase
+  const { data: allScans } = await admin
     .from('scans')
     .select('id, completed_at')
     .eq('project_id', project.id)
@@ -56,7 +59,7 @@ export async function GET(
   const sentimentTimeline = [];
   if (allScans) {
     for (const scan of allScans) {
-      const { data: analyses } = await supabase
+      const { data: analyses } = await admin
         .from('serp_results')
         .select('ai_analysis(sentiment)')
         .eq('scan_id', scan.id);
@@ -78,7 +81,7 @@ export async function GET(
   }
 
   // Top domains
-  const { data: domainResults } = await supabase
+  const { data: domainResults } = await admin
     .from('serp_results')
     .select('domain, is_competitor')
     .eq('scan_id', currentScanId);
@@ -120,20 +123,21 @@ export async function GET(
   });
 }
 
-async function getScanKPIs(supabase: ReturnType<typeof createServerSupabase>, scanId: string) {
-  const { data: results } = await supabase
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function getScanKPIs(client: any, scanId: string) {
+  const { data: results } = await client
     .from('serp_results')
     .select('domain, is_competitor, ai_analysis(sentiment_score)')
     .eq('scan_id', scanId);
 
   const totalResults = results?.length || 0;
-  const uniqueDomains = new Set(results?.map((r) => r.domain)).size;
-  const competitorMentions = results?.filter((r) => r.is_competitor).length || 0;
+  const uniqueDomains = new Set(results?.map((r: { domain: string }) => r.domain)).size;
+  const competitorMentions = results?.filter((r: { is_competitor: boolean }) => r.is_competitor).length || 0;
 
   let sentimentSum = 0;
   let sentimentCount = 0;
-  results?.forEach((r) => {
-    const analysis = r.ai_analysis as unknown as { sentiment_score: number }[] | null;
+  results?.forEach((r: { ai_analysis: unknown }) => {
+    const analysis = r.ai_analysis as { sentiment_score: number }[] | null;
     if (analysis && analysis[0]) {
       sentimentSum += analysis[0].sentiment_score;
       sentimentCount++;
