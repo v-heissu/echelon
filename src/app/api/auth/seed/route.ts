@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 export async function POST(request: Request) {
@@ -43,35 +42,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'Existing user promoted to admin and password synced', id: userId });
     }
 
-    // Check auth server settings
-    const settingsRes = await fetch(
-      `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/settings`,
-      { headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY! } }
-    );
-    const authSettings = await settingsRes.json();
-
-    // Verify login works server-side
-    const anonClient = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    );
-    const { error: loginErr } = await anonClient.auth.signInWithPassword({
-      email: adminEmail,
-      password: adminPassword,
-    });
-
-    return NextResponse.json({
-      message: 'Admin already exists, password synced',
-      loginTest: loginErr ? `FAILED: ${loginErr.message}` : 'OK',
-      emailHint: `${adminEmail.substring(0, 4)}***@${adminEmail.split('@')[1]}`,
-      supabaseProject: process.env.NEXT_PUBLIC_SUPABASE_URL?.replace('https://', '').split('.')[0],
-      authSettings: {
-        external_email: authSettings?.external?.email,
-        external_phone: authSettings?.external?.phone,
-        disable_signup: authSettings?.disable_signup,
-        mailer_autoconfirm: authSettings?.mailer_autoconfirm,
-      },
-    });
+    return NextResponse.json({ message: 'Admin already exists, password synced' });
   }
 
   // Create auth user
