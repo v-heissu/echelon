@@ -17,15 +17,24 @@ export async function POST(request: Request) {
 
   const supabase = createAdminClient();
 
-  // Check if admin already exists
+  // Check if profile already exists
   const { data: existingUsers } = await supabase
     .from('users')
-    .select('id')
+    .select('id, role')
     .eq('email', adminEmail)
     .limit(1);
 
   if (existingUsers && existingUsers.length > 0) {
-    return NextResponse.json({ message: 'Admin already exists' });
+    // Profile exists but might not be admin (e.g. trigger created it as client)
+    if (existingUsers[0].role === 'admin') {
+      return NextResponse.json({ message: 'Admin already exists' });
+    }
+    // Promote to admin
+    await supabase
+      .from('users')
+      .update({ role: 'admin', display_name: 'Admin' })
+      .eq('id', existingUsers[0].id);
+    return NextResponse.json({ message: 'Existing user promoted to admin', id: existingUsers[0].id });
   }
 
   // Create auth user
@@ -39,13 +48,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: authError.message }, { status: 500 });
   }
 
-  // Create user profile
-  const { error: profileError } = await supabase.from('users').insert({
-    id: authUser.user.id,
-    email: adminEmail,
-    display_name: 'Admin',
-    role: 'admin',
-  });
+  // The on_auth_user_created trigger auto-creates the profile as 'client'.
+  // Promote to admin and set display name.
+  const { error: profileError } = await supabase
+    .from('users')
+    .update({ role: 'admin', display_name: 'Admin' })
+    .eq('id', authUser.user.id);
 
   if (profileError) {
     return NextResponse.json({ error: profileError.message }, { status: 500 });
