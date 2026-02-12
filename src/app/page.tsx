@@ -34,12 +34,13 @@ export default async function Home() {
     redirect(`/project/${proj.slug}`);
   }
 
-  // No profile or no projects — redirect to admin if admin, otherwise stay
-  if (profile) {
-    redirect('/admin');
+  if (!profile) {
+    // User authenticated but no profile in public.users — sign out to break the loop
+    await supabase.auth.signOut();
+    redirect('/login?error=no_profile');
   }
 
-  // User authenticated but no profile in public.users — sign out to break the loop
+  // Client user with no assigned projects — sign out with informative error
   await supabase.auth.signOut();
   redirect('/login?error=no_profile');
 }
