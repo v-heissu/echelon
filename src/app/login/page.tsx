@@ -1,15 +1,20 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
 export default function LoginPage() {
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [error, setError] = useState(
+    searchParams.get('error') === 'no_profile'
+      ? 'Account non configurato. Contatta l\'amministratore.'
+      : ''
+  );
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const supabase = createClient();

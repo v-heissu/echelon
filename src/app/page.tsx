@@ -39,6 +39,7 @@ export default async function Home() {
     redirect('/admin');
   }
 
-  // User authenticated but no profile in users table — sign out to break loop
-  redirect('/login');
+  // User authenticated but no profile in public.users — sign out to break the loop
+  await supabase.auth.signOut();
+  redirect('/login?error=no_profile');
 }
