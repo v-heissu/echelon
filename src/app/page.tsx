@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { redirect } from 'next/navigation';
 import { createServerSupabase } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 export default async function Home() {
   const supabase = createServerSupabase();
@@ -11,18 +12,26 @@ export default async function Home() {
     redirect('/login');
   }
 
-  const { data: profile } = await supabase
+  // Use admin client for profile lookup to avoid RLS/session propagation issues
+  const admin = createAdminClient();
+
+  const { data: profile } = await admin
     .from('users')
     .select('role')
     .eq('id', user.id)
     .single();
 
-  if (profile?.role === 'admin') {
+  if (!profile) {
+    await supabase.auth.signOut();
+    redirect('/login?error=no_profile');
+  }
+
+  if (profile.role === 'admin') {
     redirect('/admin');
   }
 
   // Client user: redirect to first assigned project
-  const { data: membership } = await supabase
+  const { data: membership } = await admin
     .from('project_users')
     .select('project_id, projects(slug)')
     .eq('user_id', user.id)
@@ -34,13 +43,7 @@ export default async function Home() {
     redirect(`/project/${proj.slug}`);
   }
 
-  if (!profile) {
-    // User authenticated but no profile in public.users — sign out to break the loop
-    await supabase.auth.signOut();
-    redirect('/login?error=no_profile');
-  }
-
-  // Client user with no assigned projects — sign out with informative error
+  // Client user with no assigned projects
   await supabase.auth.signOut();
   redirect('/login?error=no_profile');
 }

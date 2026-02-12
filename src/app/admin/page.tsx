@@ -1,13 +1,14 @@
 export const dynamic = 'force-dynamic';
 
-import { createServerSupabase } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { FolderOpen, Users, Activity, AlertCircle } from 'lucide-react';
 
 export default async function AdminDashboard() {
-  const supabase = createServerSupabase();
+  // Middleware already verified admin access; use admin client to bypass RLS
+  const supabase = createAdminClient();
 
   const [
     { count: projectCount },
