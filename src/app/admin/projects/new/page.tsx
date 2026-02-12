@@ -114,30 +114,46 @@ export default function NewProjectPage() {
 
   async function handleSubmit() {
     setLoading(true);
+    try {
+      const res = await fetch('/api/admin/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name,
+          industry,
+          keywords,
+          competitors,
+          sources,
+          schedule,
+          schedule_day: scheduleDay,
+          language,
+          location_code: locationCode,
+        }),
+      });
 
-    const res = await fetch('/api/admin/projects', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name,
-        industry,
-        keywords,
-        competitors,
-        sources,
-        schedule,
-        schedule_day: scheduleDay,
-        language,
-        location_code: locationCode,
-      }),
-    });
+      if (!res.ok) {
+        const data = await res.json();
+        alert('Errore: ' + data.error);
+        return;
+      }
 
-    if (res.ok) {
-      router.push('/admin/projects');
-    } else {
-      const data = await res.json();
-      alert('Errore: ' + data.error);
+      const project = await res.json();
+
+      // Automatically trigger first scan if keywords are configured
+      if (keywords.length > 0) {
+        await fetch('/api/scans/trigger', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ project_slug: project.slug }),
+        });
+      }
+
+      router.push(`/project/${project.slug}`);
+    } catch {
+      alert('Errore di rete. Riprova.');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }
 
   function toggleSource(source: string) {
