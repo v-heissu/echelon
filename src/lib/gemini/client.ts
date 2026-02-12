@@ -1,5 +1,20 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
+export interface ProjectAutofillInput {
+  name: string;
+  description?: string;
+}
+
+export interface ProjectAutofillResult {
+  industry: string;
+  keywords: string[];
+  competitors: string[];
+  language: string;
+  location_code: number;
+  sources: string[];
+  schedule: string;
+}
+
 interface AnalysisInput {
   position: number;
   title: string;
@@ -92,5 +107,68 @@ ${JSON.stringify(results, null, 2)}`;
     }
 
     throw new Error('Gemini analysis failed after retries');
+  }
+
+  async suggestProjectFields(input: ProjectAutofillInput): Promise<ProjectAutofillResult> {
+    const model = this.genAI.getGenerativeModel({
+      model: this.modelName,
+      generationConfig: {
+        temperature: 0.7,
+        responseMimeType: 'application/json',
+      },
+    });
+
+    const prompt = `Sei un esperto di brand intelligence e monitoraggio della reputazione online.
+Dato il nome di un progetto/brand e un'eventuale descrizione, suggerisci i campi per configurare un progetto di monitoraggio SERP.
+
+NOME PROGETTO: ${input.name}
+${input.description ? `DESCRIZIONE: ${input.description}` : ''}
+
+Genera:
+1. "industry": la industry/settore più appropriato (una parola o breve frase, es: "fintech", "automotive", "fashion luxury")
+2. "keywords": array di 5-10 keyword strategiche da monitorare nelle SERP. Includi:
+   - Il nome del brand/progetto e sue varianti
+   - Keyword di settore rilevanti
+   - Combinazioni brand + settore
+   - Keyword di reputazione (es: "brand recensioni", "brand opinioni")
+3. "competitors": array di 3-5 domini di competitor reali e plausibili nel settore (solo dominio, es: "competitor.com")
+4. "language": codice lingua più appropriato ("it", "en", "de", "fr", "es")
+5. "location_code": codice DataForSEO per la location (2380=Italia, 2840=USA, 2826=UK, 2276=Germania, 2250=Francia, 2724=Spagna)
+6. "sources": array di fonti SERP consigliate, scegli tra "google_organic" e "google_news"
+7. "schedule": frequenza consigliata ("weekly", "monthly", "manual")
+
+Rispondi SOLO con JSON valido.
+Output format:
+{
+  "industry": "settore",
+  "keywords": ["keyword1", "keyword2", ...],
+  "competitors": ["domain1.com", "domain2.com", ...],
+  "language": "it",
+  "location_code": 2380,
+  "sources": ["google_organic", "google_news"],
+  "schedule": "weekly"
+}`;
+
+    const maxRetries = 3;
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        const result = await model.generateContent(prompt);
+        const text = result.response.text();
+        const parsed = JSON.parse(text) as ProjectAutofillResult;
+
+        if (!parsed.industry || !Array.isArray(parsed.keywords)) {
+          throw new Error('Invalid autofill response structure');
+        }
+
+        return parsed;
+      } catch (error) {
+        if (attempt === maxRetries - 1) {
+          throw error;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 1000 * (attempt + 1)));
+      }
+    }
+
+    throw new Error('Gemini autofill failed after retries');
   }
 }
