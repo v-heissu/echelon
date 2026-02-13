@@ -51,6 +51,7 @@ export default function ProjectDashboard() {
   const processingRef = useRef(false);
   const mountedRef = useRef(true);
   const scanIdRef = useRef<string | null>(null);
+  const dataRef = useRef<DashboardData | null>(null);
 
   const loadData = useCallback(async () => {
     try {
@@ -59,6 +60,7 @@ export default function ProjectDashboard() {
         const dashData = await dashRes.json();
         if (mountedRef.current) {
           setData(dashData);
+          dataRef.current = dashData;
           if (dashData.active_scan?.id) {
             scanIdRef.current = dashData.active_scan.id;
           }
@@ -72,28 +74,32 @@ export default function ProjectDashboard() {
   }, [slug]);
 
   // Poll scan status (lightweight) for progress bar updates
+  // Uses functional setState to avoid stale closure on `data`
   const pollScanStatus = useCallback(async () => {
     if (!scanIdRef.current) return;
     try {
       const res = await fetch(`/api/scans/${scanIdRef.current}/status`);
       if (res.ok) {
         const statusData = await res.json();
-        if (mountedRef.current && data) {
-          setData(prev => prev ? {
-            ...prev,
-            active_scan: statusData.status === 'running' ? {
-              id: statusData.id,
-              total_tasks: statusData.total_tasks,
-              completed_tasks: statusData.completed_tasks,
-            } : null,
-          } : prev);
+        if (mountedRef.current) {
+          setData(prev => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              active_scan: statusData.status === 'running' ? {
+                id: statusData.id,
+                total_tasks: statusData.total_tasks,
+                completed_tasks: statusData.completed_tasks,
+              } : null,
+            };
+          });
           setJobDetails(statusData.jobs || []);
         }
       }
     } catch {
       // Ignore polling errors
     }
-  }, [data]);
+  }, []);
 
   // Process single job worker
   const processOne = useCallback(async (): Promise<ProcessResult | null> => {
@@ -183,6 +189,8 @@ export default function ProjectDashboard() {
 
   useEffect(() => {
     mountedRef.current = true;
+    processingRef.current = false; // Reset on mount to avoid stale ref from previous instance
+    scanIdRef.current = null;
     loadData();
     return () => { mountedRef.current = false; };
   }, [loadData]);
@@ -204,7 +212,8 @@ export default function ProjectDashboard() {
       const statusInterval = setInterval(pollScanStatus, 3000);
       const dataInterval = setInterval(() => {
         loadData();
-        if (data?.active_scan && !processingRef.current) {
+        // Use ref to check active scan to avoid stale closure
+        if (dataRef.current?.active_scan && !processingRef.current) {
           processJobsLoop();
         }
       }, 10000);
