@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Plus, ExternalLink, Play, Search, Calendar, Globe, FolderOpen } from 'lucide-react';
+import { Plus, ExternalLink, Play, Search, Calendar, Globe, FolderOpen, Trash2 } from 'lucide-react';
 import { Project } from '@/types/database';
 
 export default function ProjectsPage() {
@@ -41,6 +41,21 @@ export default function ProjectsPage() {
     } else {
       const data = await res.json();
       alert('Errore: ' + data.error);
+    }
+  }
+
+  async function deleteProject(slug: string, name: string) {
+    if (!confirm(`Eliminare "${name}"? Tutti i dati (scan, risultati, analisi) saranno persi.`)) return;
+    try {
+      const res = await fetch(`/api/admin/projects/${slug}`, { method: 'DELETE' });
+      if (res.ok) {
+        loadProjects();
+      } else {
+        const data = await res.json();
+        alert('Errore eliminazione: ' + data.error);
+      }
+    } catch {
+      alert('Errore di rete durante l\'eliminazione.');
     }
   }
 
@@ -139,6 +154,14 @@ export default function ProjectsPage() {
                   >
                     <Play className="h-3.5 w-3.5" />
                     Scan
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                    onClick={() => deleteProject(project.slug, project.name)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
                   </Button>
                 </div>
               </CardContent>
