@@ -24,16 +24,19 @@ export async function GET(
     ? Math.round((scan.completed_tasks / scan.total_tasks) * 100)
     : 0;
 
-  // Get failed jobs count
-  const { count: failedCount } = await admin
+  // Get job details for accordion
+  const { data: jobs } = await admin
     .from('job_queue')
-    .select('*', { count: 'exact', head: true })
+    .select('id, keyword, source, status, started_at, completed_at, error_message')
     .eq('scan_id', params.id)
-    .eq('status', 'failed');
+    .order('created_at', { ascending: true });
+
+  const failedCount = jobs?.filter(j => j.status === 'failed').length || 0;
 
   return NextResponse.json({
     ...scan,
     progress,
-    failed_tasks: failedCount || 0,
+    failed_tasks: failedCount,
+    jobs: jobs || [],
   });
 }

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
+import { EchelonLogo } from '@/components/ui/logo';
 import {
   LayoutDashboard,
   List,
@@ -13,7 +14,6 @@ import {
   Download,
   LogOut,
   ArrowLeft,
-  Shield,
 } from 'lucide-react';
 
 interface ProjectSidebarProps {
@@ -44,15 +44,13 @@ export function ProjectSidebar({ slug, projectName, isAdmin }: ProjectSidebarPro
   }
 
   return (
-    <aside className="w-64 bg-primary min-h-screen flex flex-col">
-      <div className="p-6 pb-4">
+    <aside className="w-[260px] bg-gradient-to-b from-[#001437] to-[#001a42] min-h-screen flex flex-col border-r border-white/5">
+      <div className="p-5 pb-4">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-accent to-teal flex items-center justify-center">
-            <Shield className="h-5 w-5 text-white" />
-          </div>
+          <EchelonLogo size={38} />
           <div className="min-w-0">
-            <h1 className="text-lg font-bold text-white tracking-tight">ECHELON</h1>
-            <p className="text-white/40 text-[10px] font-medium uppercase tracking-widest truncate">
+            <h1 className="text-base font-bold text-white tracking-wide">ECHELON</h1>
+            <p className="text-white/35 text-[9px] font-semibold uppercase tracking-[0.2em] truncate">
               {projectName}
             </p>
           </div>
@@ -71,11 +69,14 @@ export function ProjectSidebar({ slug, projectName, isAdmin }: ProjectSidebarPro
         </div>
       )}
 
-      <div className="px-4 mb-2">
-        <div className="h-px bg-white/10" />
+      <div className="px-5 mb-3 mt-1">
+        <div className="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
       </div>
 
-      <nav className="flex-1 px-3 mt-2">
+      <nav className="flex-1 px-3">
+        <p className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-widest text-white/20">
+          Navigazione
+        </p>
         {navItems.map((item) => {
           const isActive =
             item.href === basePath
@@ -87,23 +88,24 @@ export function ProjectSidebar({ slug, projectName, isAdmin }: ProjectSidebarPro
               key={item.href}
               href={item.href}
               className={cn(
-                'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium mb-1 transition-all duration-200',
+                'flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-medium mb-0.5 transition-all duration-200',
                 isActive
-                  ? 'bg-accent text-white shadow-lg shadow-accent/20'
-                  : 'text-white/50 hover:bg-white/5 hover:text-white/90'
+                  ? 'bg-accent/90 text-white shadow-lg shadow-accent/25 backdrop-blur-sm'
+                  : 'text-white/45 hover:bg-white/[0.06] hover:text-white/90'
               )}
             >
-              <item.icon className="h-4 w-4" />
+              <item.icon className={cn('h-[18px] w-[18px]', isActive ? 'text-white' : 'text-white/40')} />
               {item.label}
             </Link>
           );
         })}
       </nav>
 
-      <div className="p-3 border-t border-white/10">
+      <div className="p-3 mt-auto">
+        <div className="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent mb-3" />
         <button
           onClick={handleLogout}
-          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-white/40 hover:bg-white/5 hover:text-white/80 w-full transition-all duration-200"
+          className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] text-white/35 hover:bg-white/[0.06] hover:text-white/80 w-full transition-all duration-200"
         >
           <LogOut className="h-4 w-4" />
           Esci

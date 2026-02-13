@@ -6,57 +6,62 @@ import { KPICards } from '@/components/dashboard/kpi-cards';
 import { SentimentChart } from '@/components/dashboard/sentiment-chart';
 import { DomainBarChart } from '@/components/dashboard/domain-bar-chart';
 import { ThemeBubbleChart } from '@/components/dashboard/theme-bubble-chart';
-import { BarChart3, Loader2, AlertTriangle } from 'lucide-react';
+import { BarChart3, Loader2, AlertTriangle, ChevronDown, ChevronUp, CheckCircle2, XCircle, Clock } from 'lucide-react';
 
 interface DashboardData {
   kpi: { total_results: number; unique_domains: number; competitor_mentions: number; avg_sentiment: number };
   delta: { total_results: number; unique_domains: number; competitor_mentions: number; avg_sentiment: number };
   sentiment_distribution: { date: string; positive: number; negative: number; neutral: number; mixed: number }[];
   top_domains: { domain: string; count: number; is_competitor: boolean }[];
+  theme_sentiments: { name: string; count: number; sentiment: string; sentiment_score: number }[];
   scan_dates: string[];
-  active_scan: { total_tasks: number; completed_tasks: number } | null;
+  active_scan: { id: string; total_tasks: number; completed_tasks: number } | null;
 }
 
 interface ProcessResult {
   status: 'processed' | 'no_jobs' | 'error';
   keyword?: string;
+  source?: string;
   error?: string;
   pendingCount: number;
 }
+
+interface ScanJob {
+  id: string;
+  keyword: string;
+  source: string;
+  status: string;
+  started_at: string | null;
+  completed_at: string | null;
+  error_message: string | null;
+}
+
+const PARALLEL_WORKERS = 3;
 
 export default function ProjectDashboard() {
   const params = useParams();
   const slug = params.slug as string;
   const [data, setData] = useState<DashboardData | null>(null);
-  const [themes, setThemes] = useState<{ name: string; count: number; sentiment: string; sentiment_score: number }[]>([]);
   const [loading, setLoading] = useState(true);
   const [processingStatus, setProcessingStatus] = useState<string | null>(null);
   const [processingError, setProcessingError] = useState<string | null>(null);
+  const [jobDetails, setJobDetails] = useState<ScanJob[]>([]);
+  const [showJobDetails, setShowJobDetails] = useState(false);
+  const [processedKeywords, setProcessedKeywords] = useState<{ keyword: string; source: string; status: 'ok' | 'error' }[]>([]);
   const processingRef = useRef(false);
   const mountedRef = useRef(true);
+  const scanIdRef = useRef<string | null>(null);
 
   const loadData = useCallback(async () => {
     try {
-      const [dashRes, tagsRes] = await Promise.all([
-        fetch(`/api/projects/${slug}/dashboard`),
-        fetch(`/api/projects/${slug}/tags`),
-      ]);
-
+      const dashRes = await fetch(`/api/projects/${slug}/dashboard`);
       if (dashRes.ok) {
         const dashData = await dashRes.json();
-        if (mountedRef.current) setData(dashData);
-      }
-      if (tagsRes.ok) {
-        const tags = await tagsRes.json();
         if (mountedRef.current) {
-          setThemes(
-            tags.map((t: { name: string; count: number }) => ({
-              name: t.name,
-              count: t.count,
-              sentiment: 'neutral',
-              sentiment_score: 0,
-            }))
-          );
+          setData(dashData);
+          if (dashData.active_scan?.id) {
+            scanIdRef.current = dashData.active_scan.id;
+          }
         }
       }
     } catch {
@@ -66,75 +71,115 @@ export default function ProjectDashboard() {
     }
   }, [slug]);
 
-  // Process jobs one at a time from the browser.
-  // Browser HTTP requests stay alive (unlike Vercel serverless fire-and-forget).
-  // Each call to /api/scans/process processes ONE job and returns the result.
-  // We chain calls until all jobs are done.
+  // Poll scan status (lightweight) for progress bar updates
+  const pollScanStatus = useCallback(async () => {
+    if (!scanIdRef.current) return;
+    try {
+      const res = await fetch(`/api/scans/${scanIdRef.current}/status`);
+      if (res.ok) {
+        const statusData = await res.json();
+        if (mountedRef.current && data) {
+          setData(prev => prev ? {
+            ...prev,
+            active_scan: statusData.status === 'running' ? {
+              id: statusData.id,
+              total_tasks: statusData.total_tasks,
+              completed_tasks: statusData.completed_tasks,
+            } : null,
+          } : prev);
+          setJobDetails(statusData.jobs || []);
+        }
+      }
+    } catch {
+      // Ignore polling errors
+    }
+  }, [data]);
+
+  // Process single job worker
+  const processOne = useCallback(async (): Promise<ProcessResult | null> => {
+    try {
+      const res = await fetch('/api/scans/process', { method: 'POST' });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+        return { status: 'error', error: errData.detail || errData.error, pendingCount: -1 };
+      }
+      return await res.json();
+    } catch {
+      return { status: 'error', error: 'Errore di rete', pendingCount: -1 };
+    }
+  }, []);
+
+  // Process jobs with parallel workers
   const processJobsLoop = useCallback(async () => {
     if (processingRef.current) return;
     processingRef.current = true;
     if (mountedRef.current) {
       setProcessingStatus('Avvio elaborazione...');
       setProcessingError(null);
+      setProcessedKeywords([]);
     }
 
     let totalProcessed = 0;
     let consecutiveErrors = 0;
+    let allDone = false;
 
-    while (mountedRef.current) {
-      try {
-        const res = await fetch('/api/scans/process', { method: 'POST' });
+    while (mountedRef.current && !allDone) {
+      // Launch parallel workers
+      const promises = Array.from({ length: PARALLEL_WORKERS }, () => processOne());
+      const results = await Promise.all(promises);
 
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
-          const errMsg = errData.detail || errData.error || `HTTP ${res.status}`;
-          console.error('Process endpoint error:', errMsg);
-          if (mountedRef.current) setProcessingError(`Errore worker: ${errMsg}`);
-          break;
-        }
-
-        const result: ProcessResult = await res.json();
+      for (const result of results) {
+        if (!result || !mountedRef.current) continue;
 
         if (result.status === 'processed') {
           totalProcessed++;
           consecutiveErrors = 0;
           if (mountedRef.current) {
-            setProcessingStatus(`Elaborato: "${result.keyword}" (${totalProcessed} completati)`);
+            setProcessingStatus(`${totalProcessed} task completati`);
             setProcessingError(null);
+            setProcessedKeywords(prev => [
+              ...prev,
+              { keyword: result.keyword || '', source: result.source || '', status: 'ok' },
+            ]);
           }
-          // Refresh dashboard data every 2 jobs
-          if (totalProcessed % 2 === 0) loadData();
         } else if (result.status === 'error') {
           consecutiveErrors++;
-          console.error(`Job error (${result.keyword}):`, result.error);
           if (mountedRef.current) {
-            setProcessingStatus(`Errore su "${result.keyword}", riprovando...`);
+            setProcessedKeywords(prev => [
+              ...prev,
+              { keyword: result.keyword || '?', source: result.source || '', status: 'error' },
+            ]);
           }
-          // Stop after too many consecutive errors
-          if (consecutiveErrors >= 5) {
+          if (consecutiveErrors >= 8) {
             if (mountedRef.current) {
               setProcessingError(`Troppi errori consecutivi. Ultimo: ${result.error}`);
             }
+            allDone = true;
             break;
           }
         } else if (result.status === 'no_jobs') {
+          allDone = true;
           break;
         }
 
-        if (result.pendingCount === 0) break;
-      } catch (error) {
-        console.error('Process fetch error:', error);
-        if (mountedRef.current) setProcessingError('Errore di rete durante elaborazione');
-        break;
+        if (result.pendingCount === 0) {
+          allDone = true;
+          break;
+        }
+      }
+
+      // Refresh progress every batch
+      if (mountedRef.current && !allDone) {
+        pollScanStatus();
       }
     }
 
     processingRef.current = false;
     if (mountedRef.current) {
       setProcessingStatus(null);
-      loadData(); // Final refresh
+      loadData();
     }
-  }, [loadData]);
+  }, [loadData, processOne, pollScanStatus]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -142,42 +187,46 @@ export default function ProjectDashboard() {
     return () => { mountedRef.current = false; };
   }, [loadData]);
 
-  // When active scan detected, start processing from browser
+  // When active scan detected, start processing
   useEffect(() => {
     if (!loading && data?.active_scan && !processingRef.current) {
       processJobsLoop();
     }
   }, [loading, data?.active_scan, processJobsLoop]);
 
-  // Poll dashboard data every 15s during active scan, 60s otherwise
+  // Poll: fast during scan (3s for status, 10s for data), slow otherwise (60s)
   useEffect(() => {
     if (loading) return;
 
-    const pollInterval = data?.active_scan ? 15000 : 60000;
+    const isActive = !!data?.active_scan || processingRef.current;
 
-    const interval = setInterval(() => {
-      loadData();
-      // Re-trigger processing if scan still active and processor stopped
-      if (data?.active_scan && !processingRef.current) {
-        processJobsLoop();
-      }
-    }, pollInterval);
-
-    return () => clearInterval(interval);
-  }, [loading, data?.active_scan, loadData, processJobsLoop]);
+    if (isActive) {
+      const statusInterval = setInterval(pollScanStatus, 3000);
+      const dataInterval = setInterval(() => {
+        loadData();
+        if (data?.active_scan && !processingRef.current) {
+          processJobsLoop();
+        }
+      }, 10000);
+      return () => { clearInterval(statusInterval); clearInterval(dataInterval); };
+    } else {
+      const interval = setInterval(loadData, 60000);
+      return () => clearInterval(interval);
+    }
+  }, [loading, data?.active_scan, loadData, processJobsLoop, pollScanStatus]);
 
   if (loading) {
     return (
-      <div className="space-y-4 animate-fade-in-up">
-        <div className="h-8 w-36 rounded-lg animate-shimmer" />
-        <div className="grid grid-cols-4 gap-4">
+      <div className="space-y-6 animate-fade-in-up">
+        <div className="h-8 w-48 rounded-xl animate-shimmer" />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-24 rounded-lg animate-shimmer" />
+            <div key={i} className="h-28 rounded-2xl animate-shimmer" />
           ))}
         </div>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="h-80 rounded-lg animate-shimmer" />
-          <div className="h-80 rounded-lg animate-shimmer" />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          <div className="h-80 rounded-2xl animate-shimmer" />
+          <div className="h-80 rounded-2xl animate-shimmer" />
         </div>
       </div>
     );
@@ -185,12 +234,12 @@ export default function ProjectDashboard() {
 
   if (!data || (data.kpi.total_results === 0 && !data.active_scan && !processingStatus)) {
     return (
-      <div className="text-center py-20 animate-fade-in-up">
-        <div className="w-16 h-16 rounded-2xl bg-accent/10 flex items-center justify-center mx-auto mb-4">
-          <BarChart3 className="h-8 w-8 text-accent" />
+      <div className="text-center py-24 animate-fade-in-up">
+        <div className="w-20 h-20 rounded-3xl bg-accent/10 flex items-center justify-center mx-auto mb-5">
+          <BarChart3 className="h-10 w-10 text-accent" />
         </div>
-        <h3 className="text-lg font-semibold text-primary mb-1">Nessun dato disponibile</h3>
-        <p className="text-sm text-muted-foreground">Avvia una scan per iniziare il monitoraggio.</p>
+        <h3 className="text-xl font-semibold text-primary mb-2">Nessun dato disponibile</h3>
+        <p className="text-sm text-muted-foreground max-w-sm mx-auto">Avvia una scan dal pannello admin per iniziare il monitoraggio.</p>
       </div>
     );
   }
@@ -200,39 +249,107 @@ export default function ProjectDashboard() {
     ? Math.round((activeScan.completed_tasks / activeScan.total_tasks) * 100)
     : 0;
 
+  const themes = data.theme_sentiments?.length > 0
+    ? data.theme_sentiments
+    : [];
+
   return (
     <div className="space-y-6 animate-fade-in-up">
-      <div>
-        <h1 className="text-2xl font-bold text-primary">Dashboard</h1>
-        <p className="text-sm text-muted-foreground mt-1">Panoramica delle performance di monitoraggio</p>
+      <div className="flex items-end justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-primary tracking-tight">Dashboard</h1>
+          <p className="text-sm text-muted-foreground mt-1">Panoramica delle performance di monitoraggio</p>
+        </div>
       </div>
 
-      {activeScan && (
-        <div className="rounded-lg border border-accent/30 bg-accent/5 p-4">
-          <div className="flex items-center gap-3 mb-2">
-            <Loader2 className="h-4 w-4 text-accent animate-spin" />
-            <span className="text-sm font-medium text-primary">
-              Scan in corso... {activeScan.completed_tasks}/{activeScan.total_tasks} task completati
-            </span>
-            <span className="ml-auto text-sm font-semibold text-accent">{scanProgress}%</span>
+      {/* Scan Progress - Fixed height, no layout shift */}
+      {(activeScan || processingStatus) && (
+        <div className="rounded-2xl bg-white border border-accent/20 shadow-sm overflow-hidden">
+          <div className="p-4">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-8 h-8 rounded-xl bg-accent/10 flex items-center justify-center animate-progress-pulse">
+                <Loader2 className="h-4 w-4 text-accent animate-spin" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold text-primary">
+                    Scan in corso
+                  </span>
+                  <span className="text-sm font-bold text-accent tabular-nums">
+                    {activeScan ? `${activeScan.completed_tasks}/${activeScan.total_tasks}` : ''} ({scanProgress}%)
+                  </span>
+                </div>
+                {processingStatus && (
+                  <p className="text-xs text-muted-foreground mt-0.5 truncate">{processingStatus}</p>
+                )}
+              </div>
+            </div>
+
+            {/* Progress bar */}
+            <div className="w-full h-2.5 rounded-full bg-[#f0f2f5] overflow-hidden">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-accent to-accent-light transition-all duration-700 ease-out"
+                style={{ width: `${Math.max(scanProgress, 2)}%` }}
+              />
+            </div>
+
+            {/* Accordion toggle */}
+            <button
+              onClick={() => setShowJobDetails(!showJobDetails)}
+              className="flex items-center gap-1.5 mt-3 text-xs text-muted-foreground hover:text-primary transition-colors"
+            >
+              {showJobDetails ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+              {showJobDetails ? 'Nascondi dettagli' : 'Mostra dettagli task'}
+            </button>
           </div>
-          <div className="w-full h-2 rounded-full bg-muted overflow-hidden">
-            <div
-              className="h-full rounded-full bg-accent transition-all duration-500"
-              style={{ width: `${scanProgress}%` }}
-            />
-          </div>
-          {processingStatus && (
-            <p className="text-xs text-muted-foreground mt-2">{processingStatus}</p>
+
+          {/* Job details accordion */}
+          {showJobDetails && (
+            <div className="border-t border-[#f0f2f5] animate-slide-down">
+              <div className="p-4 max-h-64 overflow-y-auto space-y-1">
+                {jobDetails.length > 0 ? (
+                  jobDetails.map((job) => (
+                    <div key={job.id} className="flex items-center gap-2 py-1.5 px-2 rounded-lg hover:bg-[#f8f9fa] text-xs">
+                      {job.status === 'completed' && <CheckCircle2 className="h-3.5 w-3.5 text-positive shrink-0" />}
+                      {job.status === 'failed' && <XCircle className="h-3.5 w-3.5 text-destructive shrink-0" />}
+                      {job.status === 'processing' && <Loader2 className="h-3.5 w-3.5 text-accent animate-spin shrink-0" />}
+                      {job.status === 'pending' && <Clock className="h-3.5 w-3.5 text-muted-foreground shrink-0" />}
+                      <span className="font-medium text-primary truncate">{job.keyword}</span>
+                      <span className="text-muted-foreground shrink-0">
+                        {job.source === 'google_organic' ? 'Web' : 'News'}
+                      </span>
+                      {job.error_message && (
+                        <span className="text-destructive truncate ml-auto" title={job.error_message}>
+                          {job.error_message.slice(0, 40)}
+                        </span>
+                      )}
+                    </div>
+                  ))
+                ) : processedKeywords.length > 0 ? (
+                  processedKeywords.map((pk, i) => (
+                    <div key={i} className="flex items-center gap-2 py-1.5 px-2 rounded-lg text-xs">
+                      {pk.status === 'ok'
+                        ? <CheckCircle2 className="h-3.5 w-3.5 text-positive shrink-0" />
+                        : <XCircle className="h-3.5 w-3.5 text-destructive shrink-0" />
+                      }
+                      <span className="font-medium text-primary">{pk.keyword}</span>
+                      <span className="text-muted-foreground">{pk.source === 'google_organic' ? 'Web' : 'News'}</span>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-xs text-muted-foreground py-2">In attesa dei primi risultati...</p>
+                )}
+              </div>
+            </div>
           )}
         </div>
       )}
 
       {processingError && (
-        <div className="rounded-lg border border-red-300 bg-red-50 dark:bg-red-950/20 p-4 flex items-start gap-3">
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 flex items-start gap-3">
           <AlertTriangle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
           <div>
-            <p className="text-sm font-medium text-red-700 dark:text-red-400">{processingError}</p>
+            <p className="text-sm font-medium text-red-700">{processingError}</p>
             <button
               className="text-xs text-red-600 underline mt-1"
               onClick={() => {
@@ -248,7 +365,7 @@ export default function ProjectDashboard() {
 
       <KPICards kpi={data.kpi} delta={data.delta} />
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <SentimentChart data={data.sentiment_distribution} />
         <DomainBarChart data={data.top_domains} />
       </div>

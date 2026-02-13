@@ -1,7 +1,7 @@
 import * as cheerio from 'cheerio';
 
 const MAX_EXCERPT_LENGTH = 2000;
-const FETCH_TIMEOUT = 10000;
+const FETCH_TIMEOUT = 5000;
 
 export async function extractContent(url: string): Promise<string | null> {
   try {

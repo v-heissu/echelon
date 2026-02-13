@@ -97,7 +97,14 @@ export function ResultsTable({ results, onTagClick }: ResultsTableProps) {
                       <ExternalLink className="h-3 w-3 flex-shrink-0 opacity-50" />
                     </a>
                   </TableCell>
-                  <TableCell className="text-xs text-muted-foreground">{result.domain}</TableCell>
+                  <TableCell className="text-xs text-muted-foreground">
+                    <div>{result.domain}</div>
+                    {result.fetched_at && result.source === 'google_news' && (
+                      <div className="text-[10px] text-muted-foreground/60 mt-0.5">
+                        {new Date(result.fetched_at).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' })}
+                      </div>
+                    )}
+                  </TableCell>
                   <TableCell className="text-xs">{result.keyword}</TableCell>
                   <TableCell>
                     <Badge variant="outline" className="text-xs">

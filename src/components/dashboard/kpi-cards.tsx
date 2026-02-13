@@ -16,45 +16,35 @@ interface KPICardsProps {
 }
 
 const cardConfig = [
-  { key: 'total_results' as const, label: 'Risultati Totali', icon: BarChart3, color: 'accent', format: 'number' },
-  { key: 'unique_domains' as const, label: 'Domini Unici', icon: Globe, color: 'teal', format: 'number' },
-  { key: 'competitor_mentions' as const, label: 'Menzioni Competitor', icon: Building2, color: 'orange', format: 'number' },
-  { key: 'avg_sentiment' as const, label: 'Sentiment Medio', icon: Activity, color: 'positive', format: 'score' },
+  { key: 'total_results' as const, label: 'Risultati Totali', icon: BarChart3, gradient: 'from-accent to-accent-light', format: 'number' },
+  { key: 'unique_domains' as const, label: 'Domini Unici', icon: Globe, gradient: 'from-teal to-teal-light', format: 'number' },
+  { key: 'competitor_mentions' as const, label: 'Menzioni Competitor', icon: Building2, gradient: 'from-orange to-gold', format: 'number' },
+  { key: 'avg_sentiment' as const, label: 'Sentiment Medio', icon: Activity, gradient: 'from-positive to-teal', format: 'score' },
 ];
-
-const colorMap: Record<string, { bg: string; text: string }> = {
-  accent: { bg: 'bg-accent/10', text: 'text-accent' },
-  teal: { bg: 'bg-teal/10', text: 'text-teal' },
-  orange: { bg: 'bg-orange/10', text: 'text-orange' },
-  positive: { bg: 'bg-positive/10', text: 'text-positive' },
-};
 
 export function KPICards({ kpi, delta }: KPICardsProps) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-      {cardConfig.map((card) => {
-        const c = colorMap[card.color];
-        return (
-          <Card key={card.key} className="border-0 shadow-md">
-            <CardContent className="p-5">
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{card.label}</p>
-                <div className={`w-9 h-9 rounded-lg ${c.bg} flex items-center justify-center`}>
-                  <card.icon className={`h-4.5 w-4.5 ${c.text}`} />
-                </div>
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+      {cardConfig.map((card) => (
+        <Card key={card.key} className="border-0 shadow-sm rounded-2xl overflow-hidden bg-white hover:shadow-md transition-shadow duration-300">
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between mb-4">
+              <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">{card.label}</p>
+              <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${card.gradient} flex items-center justify-center shadow-sm`}>
+                <card.icon className="h-5 w-5 text-white" />
               </div>
-              <div className="flex items-end justify-between">
-                <p className="text-2xl font-bold text-primary">
-                  {card.format === 'score'
-                    ? kpi[card.key].toFixed(2)
-                    : kpi[card.key].toLocaleString('it-IT')}
-                </p>
-                <DeltaIndicator value={delta[card.key]} isScore={card.format === 'score'} />
-              </div>
-            </CardContent>
-          </Card>
-        );
-      })}
+            </div>
+            <div className="flex items-end justify-between">
+              <p className="text-3xl font-bold text-primary tracking-tight">
+                {card.format === 'score'
+                  ? kpi[card.key].toFixed(2)
+                  : kpi[card.key].toLocaleString('it-IT')}
+              </p>
+              <DeltaIndicator value={delta[card.key]} isScore={card.format === 'score'} />
+            </div>
+          </CardContent>
+        </Card>
+      ))}
     </div>
   );
 }
@@ -64,17 +54,17 @@ function DeltaIndicator({ value, isScore }: { value: number; isScore: boolean })
     return (
       <span className="flex items-center text-xs text-muted-foreground gap-0.5">
         <Minus className="h-3 w-3" />
-        —
       </span>
     );
   }
 
   const isPositive = value > 0;
   const color = isPositive ? 'text-positive' : 'text-destructive';
+  const bgColor = isPositive ? 'bg-positive/10' : 'bg-destructive/10';
   const Icon = isPositive ? TrendingUp : TrendingDown;
 
   return (
-    <span className={`flex items-center text-xs font-medium ${color} gap-0.5 px-1.5 py-0.5 rounded-md ${isPositive ? 'bg-positive/10' : 'bg-destructive/10'}`}>
+    <span className={`flex items-center text-[11px] font-semibold ${color} gap-0.5 px-2 py-1 rounded-lg ${bgColor}`}>
       <Icon className="h-3 w-3" />
       {isScore ? (value > 0 ? '+' : '') + value.toFixed(2) : `${value > 0 ? '+' : ''}${value}%`}
     </span>
