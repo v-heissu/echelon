@@ -76,7 +76,7 @@ export async function GET(
   if (tag) {
     filtered = filtered.filter((r) => {
       const analysis = r.ai_analysis as unknown as { themes: { name: string }[] }[];
-      return analysis?.[0]?.themes?.some((t) => t.name.toLowerCase() === tag.toLowerCase());
+      return analysis?.[0]?.themes?.some((t) => t.name?.toLowerCase() === tag.toLowerCase());
     });
   }
 
