@@ -13,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Plus, Trash2, Copy, Users, Check, UserPlus } from 'lucide-react';
+import { Plus, Trash2, Copy, Users, Check, UserPlus, Eye, EyeOff, RefreshCw } from 'lucide-react';
 import { User } from '@/types/database';
 
 interface UserWithProjects extends User {
@@ -29,6 +29,9 @@ export default function UsersPage() {
   const [creating, setCreating] = useState(false);
   const [tempPassword, setTempPassword] = useState('');
   const [copied, setCopied] = useState(false);
+  const [manualPassword, setManualPassword] = useState(false);
+  const [customPassword, setCustomPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   const loadUsers = useCallback(async () => {
     const res = await fetch('/api/admin/users');
@@ -47,10 +50,15 @@ export default function UsersPage() {
     setCreating(true);
     setTempPassword('');
 
+    const payload: Record<string, string> = { email: newEmail, display_name: newDisplayName };
+    if (manualPassword && customPassword) {
+      payload.password = customPassword;
+    }
+
     const res = await fetch('/api/admin/users', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: newEmail, display_name: newDisplayName }),
+      body: JSON.stringify(payload),
     });
 
     if (res.ok) {
@@ -59,6 +67,7 @@ export default function UsersPage() {
       loadUsers();
       setNewEmail('');
       setNewDisplayName('');
+      setCustomPassword('');
     } else {
       const data = await res.json();
       alert('Errore: ' + data.error);
@@ -118,28 +127,70 @@ export default function UsersPage() {
               <h3 className="font-semibold text-primary">Crea Nuovo Utente</h3>
             </div>
 
-            <form onSubmit={handleCreate} className="flex gap-3 items-end">
-              <div className="flex-1">
-                <label className="block text-xs font-medium text-muted-foreground mb-1.5">Email</label>
-                <Input
-                  type="email"
-                  value={newEmail}
-                  onChange={(e) => setNewEmail(e.target.value)}
-                  required
-                  placeholder="cliente@progetto.local"
-                />
+            <form onSubmit={handleCreate} className="space-y-3">
+              <div className="flex gap-3 items-end">
+                <div className="flex-1">
+                  <label className="block text-xs font-medium text-muted-foreground mb-1.5">Email</label>
+                  <Input
+                    type="email"
+                    value={newEmail}
+                    onChange={(e) => setNewEmail(e.target.value)}
+                    required
+                    placeholder="cliente@progetto.local"
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-xs font-medium text-muted-foreground mb-1.5">Nome</label>
+                  <Input
+                    value={newDisplayName}
+                    onChange={(e) => setNewDisplayName(e.target.value)}
+                    placeholder="Nome Cliente"
+                  />
+                </div>
               </div>
-              <div className="flex-1">
-                <label className="block text-xs font-medium text-muted-foreground mb-1.5">Nome</label>
-                <Input
-                  value={newDisplayName}
-                  onChange={(e) => setNewDisplayName(e.target.value)}
-                  placeholder="Nome Cliente"
-                />
+
+              <div className="flex gap-3 items-end">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <label className="block text-xs font-medium text-muted-foreground">Password</label>
+                    <button
+                      type="button"
+                      onClick={() => { setManualPassword(!manualPassword); setCustomPassword(''); }}
+                      className="text-xs text-accent hover:text-accent/80 transition-colors"
+                    >
+                      {manualPassword ? 'Genera automaticamente' : 'Imposta manualmente'}
+                    </button>
+                  </div>
+                  {manualPassword ? (
+                    <div className="relative">
+                      <Input
+                        type={showPassword ? 'text' : 'password'}
+                        value={customPassword}
+                        onChange={(e) => setCustomPassword(e.target.value)}
+                        required
+                        minLength={8}
+                        placeholder="Minimo 8 caratteri"
+                        className="pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-primary transition-colors"
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 h-9 px-3 rounded-md border bg-muted/30 text-sm text-muted-foreground">
+                      <RefreshCw className="h-3.5 w-3.5" />
+                      <span>Verra generata automaticamente</span>
+                    </div>
+                  )}
+                </div>
+                <Button type="submit" variant="accent" disabled={creating} className="gap-1.5">
+                  {creating ? 'Creazione...' : 'Crea'}
+                </Button>
               </div>
-              <Button type="submit" variant="accent" disabled={creating} className="gap-1.5">
-                {creating ? 'Creazione...' : 'Crea'}
-              </Button>
             </form>
 
             {tempPassword && (
