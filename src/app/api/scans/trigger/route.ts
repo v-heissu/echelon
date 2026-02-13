@@ -64,13 +64,23 @@ export async function POST(request: Request) {
 
   await admin.from('job_queue').insert(jobs);
 
-  // Trigger worker
+  // Trigger worker with short timeout to ensure request is sent
+  // We abort after 3s to avoid blocking the response, but the worker keeps processing
   const baseUrl = new URL(request.url).origin;
-  fetch(`${baseUrl}/api/worker`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ secret: process.env.WORKER_SECRET }),
-  }).catch(() => {});
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 3000);
+  try {
+    await fetch(`${baseUrl}/api/worker`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ secret: process.env.WORKER_SECRET }),
+      signal: controller.signal,
+    });
+  } catch {
+    // Timeout or network error - worker should still be processing
+  } finally {
+    clearTimeout(timeout);
+  }
 
   return NextResponse.json({ scan_id: scan.id, total_tasks: totalTasks }, { status: 201 });
 }
