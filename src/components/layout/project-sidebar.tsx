@@ -14,6 +14,8 @@ import {
   Download,
   LogOut,
   ArrowLeft,
+  Award,
+  Users,
 } from 'lucide-react';
 
 interface ProjectSidebarProps {
@@ -34,6 +36,8 @@ export function ProjectSidebar({ slug, projectName, isAdmin }: ProjectSidebarPro
     { href: `${basePath}/trends`, label: 'Trend', icon: TrendingUp },
     { href: `${basePath}/tags`, label: 'Tag Cloud', icon: Tag },
     { href: `${basePath}/competitors`, label: 'Competitor', icon: Building2 },
+    { href: `${basePath}/brands`, label: 'Brand', icon: Award },
+    { href: `${basePath}/persons`, label: 'Persone', icon: Users },
     { href: `${basePath}/export`, label: 'Export', icon: Download },
   ];
 

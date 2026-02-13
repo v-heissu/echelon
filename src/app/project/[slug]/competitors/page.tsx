@@ -5,13 +5,14 @@ import { useParams } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { ResultsTable } from '@/components/dashboard/results-table';
 import { SerpResultWithAnalysis } from '@/types/database';
-import { Building2, List } from 'lucide-react';
+import { Building2, List, X } from 'lucide-react';
 
 export default function CompetitorsPage() {
   const params = useParams();
   const slug = params.slug as string;
   const [results, setResults] = useState<SerpResultWithAnalysis[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedDomain, setSelectedDomain] = useState<string | null>(null);
 
   const loadResults = useCallback(async () => {
     const res = await fetch(`/api/projects/${slug}/results?competitor=true&limit=200`);
@@ -56,6 +57,10 @@ export default function CompetitorsPage() {
     }))
     .sort((a, b) => b.count - a.count);
 
+  const filteredResults = selectedDomain
+    ? results.filter((r) => r.domain === selectedDomain)
+    : results;
+
   if (loading) {
     return (
       <div className="space-y-4 animate-fade-in-up">
@@ -78,7 +83,13 @@ export default function CompetitorsPage() {
       {competitorStats.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {competitorStats.map((comp) => (
-            <Card key={comp.domain} className="border-0 shadow-md overflow-hidden">
+            <Card
+              key={comp.domain}
+              className={`border-0 shadow-md overflow-hidden cursor-pointer transition-all duration-200 hover:shadow-lg ${
+                selectedDomain === comp.domain ? 'ring-2 ring-orange shadow-lg' : ''
+              }`}
+              onClick={() => setSelectedDomain(selectedDomain === comp.domain ? null : comp.domain)}
+            >
               <div className="h-1 bg-gradient-to-r from-orange to-gold" />
               <CardContent className="p-5">
                 <div className="flex items-center gap-2 mb-3">
@@ -113,11 +124,21 @@ export default function CompetitorsPage() {
             <div className="w-8 h-8 rounded-lg bg-orange/10 flex items-center justify-center">
               <List className="w-4 h-4 text-orange" />
             </div>
-            <h3 className="font-semibold text-primary">Risultati Competitor</h3>
+            <h3 className="font-semibold text-primary">
+              {selectedDomain ? `Risultati per ${selectedDomain}` : 'Risultati Competitor'}
+            </h3>
+            {selectedDomain && (
+              <button
+                onClick={() => setSelectedDomain(null)}
+                className="ml-2 flex items-center gap-1 text-xs text-muted-foreground hover:text-primary bg-muted/60 px-2 py-1 rounded-full transition-colors"
+              >
+                <X className="w-3 h-3" /> Rimuovi filtro
+              </button>
+            )}
           </div>
         </div>
         <CardContent className="p-0 mt-3">
-          <ResultsTable results={results} />
+          <ResultsTable results={filteredResults} />
         </CardContent>
       </Card>
 
