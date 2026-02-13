@@ -176,6 +176,7 @@ export async function GET(
         const analysis = r.ai_analysis as unknown as { themes: { name: string }[]; sentiment: string; sentiment_score: number }[] | null;
         if (analysis && analysis[0] && analysis[0].themes) {
           for (const t of analysis[0].themes) {
+            if (!t.name) continue;
             const name = t.name.toLowerCase().trim();
             const existing = themeMap.get(name) || { count: 0, scoreSum: 0, scoreCount: 0, sentiments: {} };
             existing.count++;

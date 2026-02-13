@@ -54,6 +54,7 @@ export async function GET(
       const analysis = r.ai_analysis as unknown as { themes: { name: string }[] }[];
       if (analysis?.[0]?.themes) {
         analysis[0].themes.forEach((t) => {
+          if (!t.name) return;
           const name = t.name.toLowerCase().trim();
           themeCounts.set(name, (themeCounts.get(name) || 0) + 1);
         });

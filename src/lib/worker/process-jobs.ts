@@ -121,7 +121,7 @@ export async function processOneJob(): Promise<ProcessResult> {
         (c: string) => (item.domain || extractDomain(item.url)).includes(c)
       ),
       excerpt: excerpts[idx] || item.description,
-      ...(item.published_at ? { fetched_at: item.published_at } : {}),
+      fetched_at: item.published_at || new Date().toISOString(),
     }));
 
     const { data: savedResults, error: insertError } = await supabase
@@ -263,6 +263,7 @@ async function updateTags(
 
   for (const result of results) {
     for (const theme of result.themes) {
+      if (!theme.name) continue;
       const name = theme.name.toLowerCase().trim();
       const existing = themeMap.get(name) || { count: 0, sentimentSum: 0, sentimentCount: 0 };
       existing.count++;
