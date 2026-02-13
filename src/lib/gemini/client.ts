@@ -125,24 +125,28 @@ ${JSON.stringify(results, null, 2)}`;
       },
     });
 
+    const descriptionBlock = input.description
+      ? `\nDESCRIZIONE / CONTESTO FORNITO DALL'UTENTE:\n"""${input.description}"""\n\nIMPORTANTE: La descrizione qui sopra è il contesto chiave fornito dall'utente. Usala come base principale per generare keyword, competitor e configurazione. Le keyword e i competitor devono essere strettamente pertinenti al contesto descritto, non solo al nome del progetto.\n`
+      : '';
+
     const prompt = `Sei un esperto di brand intelligence e monitoraggio della reputazione online.
-Dato il nome di un progetto/brand e un'eventuale descrizione, suggerisci i campi per configurare un progetto di monitoraggio SERP.
+Dato il nome di un progetto/brand e la descrizione del contesto fornita dall'utente, suggerisci i campi per configurare un progetto di monitoraggio SERP.
 
 NOME PROGETTO: ${input.name}
-${input.description ? `DESCRIZIONE: ${input.description}` : ''}
-
+${descriptionBlock}
 Genera:
-1. "industry": la industry/settore più appropriato (una parola o breve frase, es: "fintech", "automotive", "fashion luxury")
+1. "industry": la industry/settore più appropriato (una parola o breve frase, es: "fintech", "automotive", "fashion luxury"). Se la descrizione indica un settore specifico, usalo.
 2. "keywords": array di 15-25 keyword strategiche da monitorare nelle SERP. Includi:
    - Il nome del brand/progetto e sue varianti
-   - Keyword di settore rilevanti
+   - Keyword specifiche derivate dalla descrizione fornita dall'utente
+   - Keyword di settore rilevanti al contesto descritto
    - Combinazioni brand + settore
    - Keyword di reputazione (es: "brand recensioni", "brand opinioni")
-   - Keyword long-tail relative al brand
+   - Keyword long-tail relative al brand e al contesto
    - Keyword informazionali legate al settore
-3. "competitors": array di 8-15 domini di competitor reali e plausibili nel settore (solo dominio, es: "competitor.com"). Includi competitor diretti, indiretti e brand affini
-4. "language": codice lingua più appropriato ("it", "en", "de", "fr", "es")
-5. "location_code": codice DataForSEO per la location (2380=Italia, 2840=USA, 2826=UK, 2276=Germania, 2250=Francia, 2724=Spagna)
+3. "competitors": array di 8-15 domini di competitor reali e plausibili nel settore (solo dominio, es: "competitor.com"). Includi competitor diretti, indiretti e brand affini. Se la descrizione menziona competitor specifici, includili.
+4. "language": codice lingua più appropriato ("it", "en", "de", "fr", "es"). Se la descrizione è in una lingua specifica, usa quella.
+5. "location_code": codice DataForSEO per la location (2380=Italia, 2840=USA, 2826=UK, 2276=Germania, 2250=Francia, 2724=Spagna). Scegli in base al contesto della descrizione.
 6. "sources": array di fonti SERP consigliate, scegli tra "google_organic" e "google_news"
 7. "schedule": frequenza consigliata ("weekly", "monthly", "manual")
 

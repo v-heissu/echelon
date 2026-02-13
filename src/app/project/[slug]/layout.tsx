@@ -39,7 +39,7 @@ export default async function ProjectLayout({
         projectName={project?.name || params.slug}
         isAdmin={profile?.role === 'admin'}
       />
-      <main className="flex-1 bg-[#f0f2f5] p-8 overflow-auto">{children}</main>
+      <main className="flex-1 content-bg p-8 overflow-auto">{children}</main>
     </div>
   );
 }

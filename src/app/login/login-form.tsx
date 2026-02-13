@@ -5,7 +5,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Shield, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
+import { EchelonLogo } from '@/components/ui/logo';
 
 export default function LoginForm() {
   const searchParams = useSearchParams();
@@ -41,23 +42,23 @@ export default function LoginForm() {
   }
 
   return (
-    <div className="w-full max-w-md animate-fade-in-up">
-      <div className="text-center mb-8">
-        <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-accent to-teal mb-4">
-          <Shield className="w-8 h-8 text-white" />
+    <div className="w-full max-w-[420px] animate-fade-in-up">
+      <div className="text-center mb-10">
+        <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white/[0.08] backdrop-blur-sm ring-1 ring-white/[0.08] mb-5 animate-float">
+          <EchelonLogo size={40} />
         </div>
-        <h1 className="text-3xl font-bold text-white tracking-tight">
+        <h1 className="text-3xl font-extrabold text-white tracking-tight">
           ECHELON
         </h1>
-        <p className="text-white/50 mt-2 text-sm">Web Intelligence Monitor</p>
+        <p className="text-white/35 mt-2 text-sm font-medium tracking-wide">Web Intelligence Monitor</p>
       </div>
 
       <form
         onSubmit={handleLogin}
-        className="bg-white rounded-xl shadow-2xl p-8 space-y-5"
+        className="bg-white/[0.06] backdrop-blur-xl rounded-2xl shadow-2xl p-8 space-y-5 ring-1 ring-white/[0.08]"
       >
         <div>
-          <label htmlFor="email" className="block text-xs font-semibold text-primary mb-1.5 uppercase tracking-wide">
+          <label htmlFor="email" className="block text-[11px] font-semibold text-white/40 mb-2 uppercase tracking-wider">
             Email
           </label>
           <Input
@@ -67,12 +68,12 @@ export default function LoginForm() {
             onChange={(e) => setEmail(e.target.value)}
             placeholder="email@esempio.it"
             required
-            className="h-11"
+            className="h-12 bg-white/[0.06] border-white/[0.08] text-white placeholder:text-white/25 focus:border-accent/50 focus:ring-accent/30"
           />
         </div>
 
         <div>
-          <label htmlFor="password" className="block text-xs font-semibold text-primary mb-1.5 uppercase tracking-wide">
+          <label htmlFor="password" className="block text-[11px] font-semibold text-white/40 mb-2 uppercase tracking-wider">
             Password
           </label>
           <Input
@@ -82,17 +83,17 @@ export default function LoginForm() {
             onChange={(e) => setPassword(e.target.value)}
             placeholder="••••••••"
             required
-            className="h-11"
+            className="h-12 bg-white/[0.06] border-white/[0.08] text-white placeholder:text-white/25 focus:border-accent/50 focus:ring-accent/30"
           />
         </div>
 
         {error && (
-          <div className="flex items-center gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/20">
-            <p className="text-sm text-destructive font-medium">{error}</p>
+          <div className="flex items-center gap-2 p-3 rounded-xl bg-red-500/10 ring-1 ring-red-500/20">
+            <p className="text-sm text-red-400 font-medium">{error}</p>
           </div>
         )}
 
-        <Button type="submit" variant="accent" className="w-full h-11 text-sm font-semibold" disabled={loading}>
+        <Button type="submit" variant="accent" className="w-full h-12 text-sm font-semibold rounded-xl" disabled={loading}>
           {loading ? (
             <>
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -104,7 +105,7 @@ export default function LoginForm() {
         </Button>
       </form>
 
-      <p className="text-center text-xs text-white/30 mt-6">
+      <p className="text-center text-[11px] text-white/20 mt-8 font-medium">
         Pro Web Digital Consulting — Cerved Group S.p.A.
       </p>
     </div>

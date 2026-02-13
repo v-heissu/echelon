@@ -224,17 +224,17 @@ export default function NewProjectPage() {
       {/* ============================================ */}
       {step === 'basics' && (
         <div className="animate-fade-in-up">
-          <Card className="border-0 shadow-lg overflow-hidden">
+          <Card className="border-0 shadow-card rounded-2xl overflow-hidden">
             {/* Gradient header */}
-            <div className="bg-gradient-to-r from-primary to-accent p-6 pb-8">
+            <div className="sidebar-mesh p-6 pb-8">
               <h2 className="text-lg font-semibold text-white">Da dove partiamo?</h2>
-              <p className="text-white/70 text-sm mt-1">
-                Inserisci il nome del brand o progetto e lascia fare il resto all&apos;AI
+              <p className="text-white/40 text-sm mt-1">
+                Inserisci il nome del brand e descrivi il contesto — l&apos;AI fara il resto
               </p>
             </div>
 
             <CardContent className="p-6 -mt-4">
-              <div className="bg-white rounded-lg border border-border shadow-sm p-6 space-y-5">
+              <div className="bg-white rounded-xl border border-border shadow-sm p-6 space-y-5">
                 <div>
                   <label className="block text-sm font-semibold text-primary mb-2">
                     Nome del progetto
@@ -249,14 +249,17 @@ export default function NewProjectPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-primary mb-2">
-                    Descrizione <span className="text-muted-foreground font-normal">(opzionale)</span>
+                  <label className="block text-sm font-semibold text-primary mb-1">
+                    Contesto per l&apos;AI
                   </label>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Descrivi il progetto, il settore, i servizi e il target. L&apos;AI user&agrave; questo contesto per generare keyword e competitor pertinenti.
+                  </p>
                   <textarea
-                    className="flex w-full rounded-md border border-border bg-white px-3 py-3 text-sm min-h-[80px] ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 placeholder:text-muted-foreground"
+                    className="flex w-full rounded-xl border border-border bg-white px-4 py-3 text-sm min-h-[100px] ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 placeholder:text-muted-foreground"
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    placeholder="Aggiungi contesto per suggerimenti pi&ugrave; precisi. Es. 'Banca online italiana specializzata in trading e investimenti'"
+                    placeholder="Es. 'Banca online italiana specializzata in trading e investimenti. Competitor principali: Fineco, Directa, Degiro. Focus su ETF, azioni e conti deposito. Target: investitori retail italiani 25-55 anni.'"
                   />
                 </div>
 
