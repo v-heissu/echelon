@@ -78,7 +78,7 @@ export default function EditProjectPage() {
       body: JSON.stringify({
         ...form,
         keywords: form.keywords.split('\n').map((k) => k.trim()).filter(Boolean),
-        competitors: form.competitors.split('\n').map((c) => c.trim()).filter(Boolean),
+        competitors: form.competitors.split(/[\n,]/).map((c) => c.trim()).filter(Boolean).slice(0, 20),
       }),
     });
 
@@ -194,11 +194,12 @@ export default function EditProjectPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-muted-foreground mb-1.5">Competitor (uno per riga)</label>
+              <label className="block text-xs font-medium text-muted-foreground mb-1.5">Competitor (uno per riga o separati da virgola, max 20)</label>
               <textarea
                 className="flex w-full rounded-md border border-border bg-white px-3 py-2 text-sm min-h-[80px] ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 placeholder:text-muted-foreground"
                 value={form.competitors}
                 onChange={(e) => setForm({ ...form, competitors: e.target.value })}
+                placeholder="dominio1.com, dominio2.it&#10;dominio3.com"
               />
             </div>
 

@@ -9,11 +9,14 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+      },
       colors: {
         background: "var(--background)",
         foreground: "var(--foreground)",
         primary: {
-          DEFAULT: "#001437",
+          DEFAULT: "#0f172a",
           foreground: "#FFFFFF",
         },
         accent: {
@@ -28,26 +31,32 @@ const config: Config = {
         gold: "#FFC76D",
         orange: "#F58B46",
         destructive: {
-          DEFAULT: "#D64641",
+          DEFAULT: "#DC2626",
           foreground: "#FFFFFF",
         },
-        positive: "#2D6A4F",
+        positive: "#059669",
         muted: {
-          DEFAULT: "#EAEAEA",
+          DEFAULT: "#f1f5f9",
           foreground: "#64748b",
         },
-        border: "#B2B8C3",
+        border: "rgba(0, 20, 55, 0.08)",
         card: {
           DEFAULT: "#FFFFFF",
-          foreground: "#001437",
+          foreground: "#0f172a",
         },
-        input: "#B2B8C3",
+        input: "#cbd5e1",
         ring: "#007AC5",
       },
       borderRadius: {
-        lg: "0.5rem",
-        md: "0.375rem",
-        sm: "0.25rem",
+        lg: "0.75rem",
+        md: "0.5rem",
+        sm: "0.375rem",
+      },
+      boxShadow: {
+        'card': '0 1px 2px rgba(0,20,55,0.04), 0 4px 12px rgba(0,20,55,0.03)',
+        'card-hover': '0 2px 4px rgba(0,20,55,0.06), 0 8px 24px rgba(0,20,55,0.06)',
+        'glow': '0 0 20px rgba(0,122,197,0.15)',
+        'glow-lg': '0 0 40px rgba(0,122,197,0.2)',
       },
     },
   },

@@ -32,10 +32,10 @@ export async function POST(request: Request) {
   const { data: profile } = await admin.from('users').select('role').eq('id', user.id).single();
   if (profile?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
-  const { email, display_name } = await request.json();
+  const { email, display_name, password } = await request.json();
 
-  // Generate temp password
-  const tempPassword = Math.random().toString(36).slice(-12) + 'A1!';
+  // Use provided password or generate one
+  const tempPassword = password || Math.random().toString(36).slice(-12) + 'A1!';
 
   // Create auth user
   const { data: authUser, error: authError } = await admin.auth.admin.createUser({

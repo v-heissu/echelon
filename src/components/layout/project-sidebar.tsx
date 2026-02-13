@@ -44,13 +44,14 @@ export function ProjectSidebar({ slug, projectName, isAdmin }: ProjectSidebarPro
   }
 
   return (
-    <aside className="w-[260px] bg-gradient-to-b from-[#001437] to-[#001a42] min-h-screen flex flex-col border-r border-white/5">
-      <div className="p-5 pb-4">
+    <aside className="w-[264px] sidebar-mesh min-h-screen flex flex-col">
+      {/* Logo area */}
+      <div className="p-6 pb-5">
         <div className="flex items-center gap-3">
-          <EchelonLogo size={38} />
+          <EchelonLogo size={40} />
           <div className="min-w-0">
-            <h1 className="text-base font-bold text-white tracking-wide">ECHELON</h1>
-            <p className="text-white/35 text-[9px] font-semibold uppercase tracking-[0.2em] truncate">
+            <h1 className="text-[15px] font-bold text-white tracking-wider">ECHELON</h1>
+            <p className="text-white/30 text-[10px] font-medium truncate mt-0.5">
               {projectName}
             </p>
           </div>
@@ -58,54 +59,59 @@ export function ProjectSidebar({ slug, projectName, isAdmin }: ProjectSidebarPro
       </div>
 
       {isAdmin && (
-        <div className="px-3 mb-1">
+        <div className="px-4 mb-2">
           <Link
             href="/admin"
-            className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-white/30 hover:bg-white/5 hover:text-white/70 transition-all duration-200"
+            className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs text-white/30 hover:bg-white/[0.06] hover:text-white/70 transition-all duration-200"
           >
-            <ArrowLeft className="h-3 w-3" />
-            Torna all&apos;admin
+            <ArrowLeft className="h-3.5 w-3.5" />
+            Admin Panel
           </Link>
         </div>
       )}
 
-      <div className="px-5 mb-3 mt-1">
-        <div className="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+      <div className="px-6 mb-4 mt-1">
+        <div className="h-px bg-gradient-to-r from-transparent via-white/[0.08] to-transparent" />
       </div>
 
-      <nav className="flex-1 px-3">
-        <p className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-widest text-white/20">
-          Navigazione
+      <nav className="flex-1 px-4">
+        <p className="px-3 mb-2.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-white/20">
+          Menu
         </p>
-        {navItems.map((item) => {
-          const isActive =
-            item.href === basePath
-              ? pathname === basePath
-              : pathname.startsWith(item.href);
+        <div className="space-y-0.5">
+          {navItems.map((item) => {
+            const isActive =
+              item.href === basePath
+                ? pathname === basePath
+                : pathname.startsWith(item.href);
 
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                'flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-medium mb-0.5 transition-all duration-200',
-                isActive
-                  ? 'bg-accent/90 text-white shadow-lg shadow-accent/25 backdrop-blur-sm'
-                  : 'text-white/45 hover:bg-white/[0.06] hover:text-white/90'
-              )}
-            >
-              <item.icon className={cn('h-[18px] w-[18px]', isActive ? 'text-white' : 'text-white/40')} />
-              {item.label}
-            </Link>
-          );
-        })}
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  'flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all duration-200 group',
+                  isActive
+                    ? 'bg-white/[0.12] text-white shadow-glow backdrop-blur-sm ring-1 ring-white/[0.08]'
+                    : 'text-white/40 hover:bg-white/[0.06] hover:text-white/80'
+                )}
+              >
+                <item.icon className={cn(
+                  'h-[17px] w-[17px] transition-colors',
+                  isActive ? 'text-accent-light' : 'text-white/30 group-hover:text-white/60'
+                )} />
+                {item.label}
+              </Link>
+            );
+          })}
+        </div>
       </nav>
 
-      <div className="p-3 mt-auto">
-        <div className="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent mb-3" />
+      <div className="p-4 mt-auto">
+        <div className="h-px bg-gradient-to-r from-transparent via-white/[0.08] to-transparent mb-3" />
         <button
           onClick={handleLogout}
-          className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] text-white/35 hover:bg-white/[0.06] hover:text-white/80 w-full transition-all duration-200"
+          className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] text-white/30 hover:bg-white/[0.06] hover:text-white/70 w-full transition-all duration-200"
         >
           <LogOut className="h-4 w-4" />
           Esci

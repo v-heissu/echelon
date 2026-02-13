@@ -30,76 +30,48 @@ export default async function AdminDashboard() {
       .limit(5),
   ]);
 
+  const statCards = [
+    { label: 'Progetti', value: projectCount || 0, icon: FolderOpen, gradient: 'from-accent to-accent-light', color: 'text-accent' },
+    { label: 'Utenti', value: userCount || 0, icon: Users, gradient: 'from-teal to-teal-light', color: 'text-teal' },
+    { label: 'Scan Recenti', value: recentScans?.length || 0, icon: Activity, gradient: 'from-positive to-teal', color: 'text-positive' },
+    { label: 'Job Falliti', value: failedJobs?.length || 0, icon: AlertCircle, gradient: 'from-destructive to-orange', color: 'text-destructive' },
+  ];
+
   return (
-    <div className="animate-fade-in-up">
+    <div className="animate-fade-in-up max-w-6xl">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-primary">Dashboard Admin</h1>
-        <p className="text-sm text-muted-foreground mt-1">Panoramica generale della piattaforma</p>
+        <h1 className="text-2xl font-bold text-primary tracking-tight">Dashboard</h1>
+        <p className="text-sm text-muted-foreground mt-1">Panoramica della piattaforma</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <Card className="border-0 shadow-md">
-          <CardContent className="p-5">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Progetti</p>
-                <p className="text-3xl font-bold text-primary mt-1">{projectCount || 0}</p>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
+        {statCards.map((stat) => (
+          <Card key={stat.label} className="border-0 shadow-card rounded-2xl overflow-hidden bg-white hover:shadow-card-hover transition-all duration-300">
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">{stat.label}</p>
+                <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${stat.gradient} flex items-center justify-center shadow-sm`}>
+                  <stat.icon className="h-5 w-5 text-white" />
+                </div>
               </div>
-              <div className="w-12 h-12 rounded-xl bg-accent/10 flex items-center justify-center">
-                <FolderOpen className="h-6 w-6 text-accent" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-0 shadow-md">
-          <CardContent className="p-5">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Utenti</p>
-                <p className="text-3xl font-bold text-primary mt-1">{userCount || 0}</p>
-              </div>
-              <div className="w-12 h-12 rounded-xl bg-accent/10 flex items-center justify-center">
-                <Users className="h-6 w-6 text-accent" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-0 shadow-md">
-          <CardContent className="p-5">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Scan Recenti</p>
-                <p className="text-3xl font-bold text-primary mt-1">{recentScans?.length || 0}</p>
-              </div>
-              <div className="w-12 h-12 rounded-xl bg-teal/10 flex items-center justify-center">
-                <Activity className="h-6 w-6 text-teal" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-0 shadow-md">
-          <CardContent className="p-5">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Job Falliti</p>
-                <p className="text-3xl font-bold text-destructive mt-1">{failedJobs?.length || 0}</p>
-              </div>
-              <div className="w-12 h-12 rounded-xl bg-destructive/10 flex items-center justify-center">
-                <AlertCircle className="h-6 w-6 text-destructive" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+              <p className={`text-3xl font-bold ${stat.label === 'Job Falliti' ? 'text-destructive' : 'text-primary'} tracking-tight`}>
+                {stat.value}
+              </p>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="border-0 shadow-md">
+        <Card className="border-0 shadow-card rounded-2xl bg-white hover:shadow-card-hover transition-all duration-300">
           <div className="p-5 pb-0 flex items-center justify-between">
-            <h3 className="font-semibold text-primary">Scan Recenti</h3>
-            <Link href="/admin/jobs" className="text-xs text-accent hover:underline flex items-center gap-1">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center">
+                <Activity className="w-4 h-4 text-accent" />
+              </div>
+              <h3 className="font-semibold text-primary text-[15px]">Scan Recenti</h3>
+            </div>
+            <Link href="/admin/jobs" className="text-xs text-accent hover:text-accent-light font-medium flex items-center gap-1 transition-colors">
               Vedi tutti <ArrowRight className="w-3 h-3" />
             </Link>
           </div>
@@ -111,12 +83,12 @@ export default async function AdminDashboard() {
                   return (
                     <div
                       key={scan.id}
-                      className="flex items-center justify-between py-3 px-3 rounded-lg hover:bg-muted/50 transition-colors"
+                      className="flex items-center justify-between py-3 px-3 rounded-xl hover:bg-muted/50 transition-colors"
                     >
                       <div>
                         <Link
                           href={`/project/${project?.slug}`}
-                          className="font-medium text-sm text-accent hover:underline"
+                          className="font-medium text-sm text-primary hover:text-accent transition-colors"
                         >
                           {project?.name || 'Unknown'}
                         </Link>
@@ -142,15 +114,20 @@ export default async function AdminDashboard() {
                 })}
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground text-center py-6">Nessuna scan recente</p>
+              <p className="text-sm text-muted-foreground text-center py-8">Nessuna scan recente</p>
             )}
           </CardContent>
         </Card>
 
-        <Card className="border-0 shadow-md">
+        <Card className="border-0 shadow-card rounded-2xl bg-white hover:shadow-card-hover transition-all duration-300">
           <div className="p-5 pb-0 flex items-center justify-between">
-            <h3 className="font-semibold text-primary">Job Falliti</h3>
-            <Link href="/admin/jobs" className="text-xs text-accent hover:underline flex items-center gap-1">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-destructive/10 flex items-center justify-center">
+                <AlertCircle className="w-4 h-4 text-destructive" />
+              </div>
+              <h3 className="font-semibold text-primary text-[15px]">Job Falliti</h3>
+            </div>
+            <Link href="/admin/jobs" className="text-xs text-accent hover:text-accent-light font-medium flex items-center gap-1 transition-colors">
               Vedi tutti <ArrowRight className="w-3 h-3" />
             </Link>
           </div>
@@ -160,7 +137,7 @@ export default async function AdminDashboard() {
                 {failedJobs.map((job) => {
                   const scanProject = job.scans as { projects: { name: string } } | null;
                   return (
-                    <div key={job.id} className="py-3 px-3 rounded-lg hover:bg-muted/50 transition-colors">
+                    <div key={job.id} className="py-3 px-3 rounded-xl hover:bg-muted/50 transition-colors">
                       <div className="flex items-center justify-between">
                         <span className="font-medium text-sm">{job.keyword}</span>
                         <Badge variant="negative">{job.source}</Badge>
@@ -178,7 +155,7 @@ export default async function AdminDashboard() {
                 })}
               </div>
             ) : (
-              <div className="text-center py-6">
+              <div className="text-center py-8">
                 <div className="w-10 h-10 rounded-xl bg-positive/10 flex items-center justify-center mx-auto mb-2">
                   <Activity className="h-5 w-5 text-positive" />
                 </div>
