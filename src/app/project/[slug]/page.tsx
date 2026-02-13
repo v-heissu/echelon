@@ -1,12 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { KPICards } from '@/components/dashboard/kpi-cards';
 import { SentimentChart } from '@/components/dashboard/sentiment-chart';
 import { DomainBarChart } from '@/components/dashboard/domain-bar-chart';
 import { ThemeBubbleChart } from '@/components/dashboard/theme-bubble-chart';
-import { BarChart3 } from 'lucide-react';
+import { BarChart3, Loader2 } from 'lucide-react';
 
 interface DashboardData {
   kpi: { total_results: number; unique_domains: number; competitor_mentions: number; avg_sentiment: number };
@@ -14,6 +14,7 @@ interface DashboardData {
   sentiment_distribution: { date: string; positive: number; negative: number; neutral: number; mixed: number }[];
   top_domains: { domain: string; count: number; is_competitor: boolean }[];
   scan_dates: string[];
+  active_scan: { total_tasks: number; completed_tasks: number } | null;
 }
 
 export default function ProjectDashboard() {
@@ -22,9 +23,10 @@ export default function ProjectDashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [themes, setThemes] = useState<{ name: string; count: number; sentiment: string; sentiment_score: number }[]>([]);
   const [loading, setLoading] = useState(true);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  useEffect(() => {
-    async function load() {
+  const loadData = useCallback(async () => {
+    try {
       const [dashRes, tagsRes] = await Promise.all([
         fetch(`/api/projects/${slug}/dashboard`),
         fetch(`/api/projects/${slug}/tags`),
@@ -42,10 +44,31 @@ export default function ProjectDashboard() {
           }))
         );
       }
+    } catch {
+      // Network error, will retry on next poll
+    } finally {
       setLoading(false);
     }
-    load();
   }, [slug]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  // Poll every 8s when scan is active, every 30s otherwise
+  useEffect(() => {
+    if (loading) return;
+
+    const pollInterval = data?.active_scan ? 8000 : 30000;
+
+    intervalRef.current = setInterval(() => {
+      loadData();
+    }, pollInterval);
+
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, [loading, data?.active_scan, loadData]);
 
   if (loading) {
     return (
@@ -64,7 +87,7 @@ export default function ProjectDashboard() {
     );
   }
 
-  if (!data) {
+  if (!data || (data.kpi.total_results === 0 && !data.active_scan)) {
     return (
       <div className="text-center py-20 animate-fade-in-up">
         <div className="w-16 h-16 rounded-2xl bg-accent/10 flex items-center justify-center mx-auto mb-4">
@@ -76,12 +99,35 @@ export default function ProjectDashboard() {
     );
   }
 
+  const activeScan = data.active_scan;
+  const scanProgress = activeScan && activeScan.total_tasks > 0
+    ? Math.round((activeScan.completed_tasks / activeScan.total_tasks) * 100)
+    : 0;
+
   return (
     <div className="space-y-6 animate-fade-in-up">
       <div>
         <h1 className="text-2xl font-bold text-primary">Dashboard</h1>
         <p className="text-sm text-muted-foreground mt-1">Panoramica delle performance di monitoraggio</p>
       </div>
+
+      {activeScan && (
+        <div className="rounded-lg border border-accent/30 bg-accent/5 p-4">
+          <div className="flex items-center gap-3 mb-2">
+            <Loader2 className="h-4 w-4 text-accent animate-spin" />
+            <span className="text-sm font-medium text-primary">
+              Scan in corso... {activeScan.completed_tasks}/{activeScan.total_tasks} task completati
+            </span>
+            <span className="ml-auto text-sm font-semibold text-accent">{scanProgress}%</span>
+          </div>
+          <div className="w-full h-2 rounded-full bg-muted overflow-hidden">
+            <div
+              className="h-full rounded-full bg-accent transition-all duration-500"
+              style={{ width: `${scanProgress}%` }}
+            />
+          </div>
+        </div>
+      )}
 
       <KPICards kpi={data.kpi} delta={data.delta} />
 
