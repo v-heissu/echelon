@@ -51,15 +51,17 @@ function extractWithCheerio(html: string): string | null {
 
     // Try to find article/main content first
     const contentSelectors = ['article', 'main', '[role="main"]', '.post-content', '.article-content', '.entry-content', '.content'];
-    let contentArea = $('body');
+    let contentSelector = 'body';
 
     for (const selector of contentSelectors) {
       const el = $(selector);
       if (el.length > 0 && el.text().trim().length > 200) {
-        contentArea = el;
+        contentSelector = selector;
         break;
       }
     }
+
+    const contentArea = $(contentSelector);
 
     // Get paragraphs from content area
     const paragraphs: string[] = [];
