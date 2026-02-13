@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { processJobs } from '@/lib/worker/process-jobs';
+import { processOneJob } from '@/lib/worker/process-jobs';
 
 export const maxDuration = 60;
 
@@ -10,7 +10,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const { processedCount } = await processJobs();
+  // Process jobs in a loop until timeout or queue empty
+  const startTime = Date.now();
+  const MAX_RUNTIME = 50000;
+  let processedCount = 0;
 
-  return NextResponse.json({ message: `Processed ${processedCount} jobs` });
+  while (Date.now() - startTime < MAX_RUNTIME) {
+    const result = await processOneJob();
+    if (result.status === 'no_jobs') break;
+    if (result.status === 'processed') processedCount++;
+    if (result.pendingCount === 0) break;
+  }
+
+  return NextResponse.json({ message: `Processed ${processedCount} jobs`, processedCount });
 }

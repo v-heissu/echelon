@@ -6,7 +6,7 @@ import { KPICards } from '@/components/dashboard/kpi-cards';
 import { SentimentChart } from '@/components/dashboard/sentiment-chart';
 import { DomainBarChart } from '@/components/dashboard/domain-bar-chart';
 import { ThemeBubbleChart } from '@/components/dashboard/theme-bubble-chart';
-import { BarChart3, Loader2 } from 'lucide-react';
+import { BarChart3, Loader2, AlertTriangle } from 'lucide-react';
 
 interface DashboardData {
   kpi: { total_results: number; unique_domains: number; competitor_mentions: number; avg_sentiment: number };
@@ -17,14 +17,23 @@ interface DashboardData {
   active_scan: { total_tasks: number; completed_tasks: number } | null;
 }
 
+interface ProcessResult {
+  status: 'processed' | 'no_jobs' | 'error';
+  keyword?: string;
+  error?: string;
+  pendingCount: number;
+}
+
 export default function ProjectDashboard() {
   const params = useParams();
   const slug = params.slug as string;
   const [data, setData] = useState<DashboardData | null>(null);
   const [themes, setThemes] = useState<{ name: string; count: number; sentiment: string; sentiment_score: number }[]>([]);
   const [loading, setLoading] = useState(true);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [processingStatus, setProcessingStatus] = useState<string | null>(null);
+  const [processingError, setProcessingError] = useState<string | null>(null);
   const processingRef = useRef(false);
+  const mountedRef = useRef(true);
 
   const loadData = useCallback(async () => {
     try {
@@ -33,67 +42,129 @@ export default function ProjectDashboard() {
         fetch(`/api/projects/${slug}/tags`),
       ]);
 
-      if (dashRes.ok) setData(await dashRes.json());
+      if (dashRes.ok) {
+        const dashData = await dashRes.json();
+        if (mountedRef.current) setData(dashData);
+      }
       if (tagsRes.ok) {
         const tags = await tagsRes.json();
-        setThemes(
-          tags.map((t: { name: string; count: number }) => ({
-            name: t.name,
-            count: t.count,
-            sentiment: 'neutral',
-            sentiment_score: 0,
-          }))
-        );
+        if (mountedRef.current) {
+          setThemes(
+            tags.map((t: { name: string; count: number }) => ({
+              name: t.name,
+              count: t.count,
+              sentiment: 'neutral',
+              sentiment_score: 0,
+            }))
+          );
+        }
       }
     } catch {
-      // Network error, will retry on next poll
+      // Network error, will retry
     } finally {
-      setLoading(false);
+      if (mountedRef.current) setLoading(false);
     }
   }, [slug]);
 
-  // Trigger worker processing from browser when scan is active.
-  // Browser HTTP requests stay alive (unlike serverless fire-and-forget),
-  // so this reliably keeps the worker running.
-  const triggerProcessing = useCallback(async () => {
-    if (processingRef.current) return; // Already running
+  // Process jobs one at a time from the browser.
+  // Browser HTTP requests stay alive (unlike Vercel serverless fire-and-forget).
+  // Each call to /api/scans/process processes ONE job and returns the result.
+  // We chain calls until all jobs are done.
+  const processJobsLoop = useCallback(async () => {
+    if (processingRef.current) return;
     processingRef.current = true;
-    try {
-      await fetch('/api/scans/process', { method: 'POST' });
-    } catch {
-      // Will retry on next poll
-    } finally {
-      processingRef.current = false;
-      // Refresh data after worker batch completes
-      loadData();
+    if (mountedRef.current) {
+      setProcessingStatus('Avvio elaborazione...');
+      setProcessingError(null);
+    }
+
+    let totalProcessed = 0;
+    let consecutiveErrors = 0;
+
+    while (mountedRef.current) {
+      try {
+        const res = await fetch('/api/scans/process', { method: 'POST' });
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+          const errMsg = errData.detail || errData.error || `HTTP ${res.status}`;
+          console.error('Process endpoint error:', errMsg);
+          if (mountedRef.current) setProcessingError(`Errore worker: ${errMsg}`);
+          break;
+        }
+
+        const result: ProcessResult = await res.json();
+
+        if (result.status === 'processed') {
+          totalProcessed++;
+          consecutiveErrors = 0;
+          if (mountedRef.current) {
+            setProcessingStatus(`Elaborato: "${result.keyword}" (${totalProcessed} completati)`);
+            setProcessingError(null);
+          }
+          // Refresh dashboard data every 2 jobs
+          if (totalProcessed % 2 === 0) loadData();
+        } else if (result.status === 'error') {
+          consecutiveErrors++;
+          console.error(`Job error (${result.keyword}):`, result.error);
+          if (mountedRef.current) {
+            setProcessingStatus(`Errore su "${result.keyword}", riprovando...`);
+          }
+          // Stop after too many consecutive errors
+          if (consecutiveErrors >= 5) {
+            if (mountedRef.current) {
+              setProcessingError(`Troppi errori consecutivi. Ultimo: ${result.error}`);
+            }
+            break;
+          }
+        } else if (result.status === 'no_jobs') {
+          break;
+        }
+
+        if (result.pendingCount === 0) break;
+      } catch (error) {
+        console.error('Process fetch error:', error);
+        if (mountedRef.current) setProcessingError('Errore di rete durante elaborazione');
+        break;
+      }
+    }
+
+    processingRef.current = false;
+    if (mountedRef.current) {
+      setProcessingStatus(null);
+      loadData(); // Final refresh
     }
   }, [loadData]);
 
   useEffect(() => {
+    mountedRef.current = true;
     loadData();
+    return () => { mountedRef.current = false; };
   }, [loadData]);
 
-  // When active scan is detected, trigger processing from browser
+  // When active scan detected, start processing from browser
   useEffect(() => {
     if (!loading && data?.active_scan && !processingRef.current) {
-      triggerProcessing();
+      processJobsLoop();
     }
-  }, [loading, data?.active_scan, triggerProcessing]);
+  }, [loading, data?.active_scan, processJobsLoop]);
 
-  // Poll every 10s when scan is active, every 30s otherwise
+  // Poll dashboard data every 15s during active scan, 60s otherwise
   useEffect(() => {
     if (loading) return;
 
-    const pollInterval = data?.active_scan ? 10000 : 30000;
+    const pollInterval = data?.active_scan ? 15000 : 60000;
 
-    intervalRef.current = setInterval(() => {
+    const interval = setInterval(() => {
       loadData();
+      // Re-trigger processing if scan still active and processor stopped
+      if (data?.active_scan && !processingRef.current) {
+        processJobsLoop();
+      }
     }, pollInterval);
 
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
-  }, [loading, data?.active_scan, loadData]);
+    return () => clearInterval(interval);
+  }, [loading, data?.active_scan, loadData, processJobsLoop]);
 
   if (loading) {
     return (
@@ -112,7 +183,7 @@ export default function ProjectDashboard() {
     );
   }
 
-  if (!data || (data.kpi.total_results === 0 && !data.active_scan)) {
+  if (!data || (data.kpi.total_results === 0 && !data.active_scan && !processingStatus)) {
     return (
       <div className="text-center py-20 animate-fade-in-up">
         <div className="w-16 h-16 rounded-2xl bg-accent/10 flex items-center justify-center mx-auto mb-4">
@@ -150,6 +221,27 @@ export default function ProjectDashboard() {
               className="h-full rounded-full bg-accent transition-all duration-500"
               style={{ width: `${scanProgress}%` }}
             />
+          </div>
+          {processingStatus && (
+            <p className="text-xs text-muted-foreground mt-2">{processingStatus}</p>
+          )}
+        </div>
+      )}
+
+      {processingError && (
+        <div className="rounded-lg border border-red-300 bg-red-50 dark:bg-red-950/20 p-4 flex items-start gap-3">
+          <AlertTriangle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
+          <div>
+            <p className="text-sm font-medium text-red-700 dark:text-red-400">{processingError}</p>
+            <button
+              className="text-xs text-red-600 underline mt-1"
+              onClick={() => {
+                setProcessingError(null);
+                processJobsLoop();
+              }}
+            >
+              Riprova
+            </button>
           </div>
         </div>
       )}
