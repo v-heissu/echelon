@@ -21,6 +21,34 @@ export async function GET(
 
   if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 });
 
+  // Auto-complete any running scans that have all tasks done (fixes stuck scans)
+  const { data: runningScans } = await admin
+    .from('scans')
+    .select('id, total_tasks, completed_tasks')
+    .eq('project_id', project.id)
+    .eq('status', 'running');
+
+  if (runningScans) {
+    for (const scan of runningScans) {
+      if (scan.total_tasks > 0 && scan.completed_tasks >= scan.total_tasks) {
+        await admin
+          .from('scans')
+          .update({ status: 'completed', completed_at: new Date().toISOString() })
+          .eq('id', scan.id);
+      }
+    }
+  }
+
+  // Check if there's a currently running scan (for progress indicator)
+  const { data: activeScan } = await admin
+    .from('scans')
+    .select('id, total_tasks, completed_tasks, started_at')
+    .eq('project_id', project.id)
+    .eq('status', 'running')
+    .order('started_at', { ascending: false })
+    .limit(1)
+    .single();
+
   // Get last 2 completed scans for delta comparison
   const { data: scans } = await admin
     .from('scans')
@@ -30,30 +58,62 @@ export async function GET(
     .order('completed_at', { ascending: false })
     .limit(2);
 
-  if (!scans || scans.length === 0) {
-    return NextResponse.json({
-      kpi: { total_results: 0, unique_domains: 0, competitor_mentions: 0, avg_sentiment: 0 },
-      delta: { total_results: 0, unique_domains: 0, competitor_mentions: 0, avg_sentiment: 0 },
-      sentiment_distribution: [],
-      top_domains: [],
-      scan_dates: [],
-    });
+  // If no completed scans, try to show data from a running scan
+  let fallbackScanId: string | null = null;
+  if ((!scans || scans.length === 0) && !activeScan) {
+    // Check for any scan with data (running or otherwise)
+    const { data: anyScan } = await admin
+      .from('scans')
+      .select('id')
+      .eq('project_id', project.id)
+      .in('status', ['running', 'completed'])
+      .order('started_at', { ascending: false })
+      .limit(1)
+      .single();
+    if (anyScan) fallbackScanId = anyScan.id;
   }
 
-  const currentScanId = scans[0].id;
-  const previousScanId = scans.length > 1 ? scans[1].id : null;
+  const emptyResponse = {
+    kpi: { total_results: 0, unique_domains: 0, competitor_mentions: 0, avg_sentiment: 0 },
+    delta: { total_results: 0, unique_domains: 0, competitor_mentions: 0, avg_sentiment: 0 },
+    sentiment_distribution: [],
+    top_domains: [],
+    scan_dates: [],
+    active_scan: activeScan ? {
+      total_tasks: activeScan.total_tasks,
+      completed_tasks: activeScan.completed_tasks,
+    } : null,
+  };
+
+  if ((!scans || scans.length === 0) && !fallbackScanId && !activeScan) {
+    return NextResponse.json(emptyResponse);
+  }
+
+  // Use fallback scan if no completed scans exist but running scan has data
+  if ((!scans || scans.length === 0) && !fallbackScanId && activeScan) {
+    fallbackScanId = activeScan.id;
+  }
+
+  // Determine which scan to show KPIs for
+  const hasCompletedScans = scans && scans.length > 0;
+  const currentScanId = hasCompletedScans ? scans[0].id : (fallbackScanId || activeScan?.id);
+  const previousScanId = hasCompletedScans && scans.length > 1 ? scans[1].id : null;
+
+  if (!currentScanId) {
+    return NextResponse.json(emptyResponse);
+  }
 
   // Current scan KPIs
   const currentKpi = await getScanKPIs(admin, currentScanId);
   const previousKpi = previousScanId ? await getScanKPIs(admin, previousScanId) : null;
 
-  // Sentiment distribution over time
+  // Sentiment distribution over time (include both completed and running scans with data)
   const { data: allScans } = await admin
     .from('scans')
-    .select('id, completed_at')
+    .select('id, completed_at, started_at, status')
     .eq('project_id', project.id)
-    .eq('status', 'completed')
-    .order('completed_at', { ascending: true })
+    .in('status', ['completed', 'running'])
+    .order('started_at', { ascending: true })
     .limit(10);
 
   const sentimentTimeline = [];
@@ -64,8 +124,10 @@ export async function GET(
         .select('ai_analysis(sentiment)')
         .eq('scan_id', scan.id);
 
+      if (!analyses || analyses.length === 0) continue;
+
       const counts = { positive: 0, negative: 0, neutral: 0, mixed: 0 };
-      analyses?.forEach((r) => {
+      analyses.forEach((r) => {
         const analysis = r.ai_analysis as unknown as { sentiment: string }[] | null;
         if (analysis && analysis[0]) {
           const s = analysis[0].sentiment as keyof typeof counts;
@@ -74,7 +136,7 @@ export async function GET(
       });
 
       sentimentTimeline.push({
-        date: scan.completed_at,
+        date: scan.completed_at || scan.started_at,
         ...counts,
       });
     }
@@ -119,7 +181,11 @@ export async function GET(
     delta,
     sentiment_distribution: sentimentTimeline,
     top_domains: topDomains,
-    scan_dates: allScans?.map((s) => s.completed_at) || [],
+    scan_dates: allScans?.map((s) => s.completed_at || s.started_at) || [],
+    active_scan: activeScan ? {
+      total_tasks: activeScan.total_tasks,
+      completed_tasks: activeScan.completed_tasks,
+    } : null,
   });
 }
 
