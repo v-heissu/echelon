@@ -62,9 +62,15 @@ export async function POST(request: Request) {
     }))
   );
 
-  await admin.from('job_queue').insert(jobs);
+  const { error: jobsError } = await admin.from('job_queue').insert(jobs);
 
-  // Trigger worker (fire-and-forget — worker processes jobs in an internal loop)
+  if (jobsError) {
+    // Cleanup the scan since jobs failed to insert
+    await admin.from('scans').delete().eq('id', scan.id);
+    return NextResponse.json({ error: 'Failed to create jobs: ' + jobsError.message }, { status: 500 });
+  }
+
+  // Best-effort worker trigger (may fail on Vercel serverless — dashboard handles fallback)
   const baseUrl = new URL(request.url).origin;
   fetch(`${baseUrl}/api/worker`, {
     method: 'POST',
