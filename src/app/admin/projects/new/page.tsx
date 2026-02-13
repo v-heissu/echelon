@@ -68,12 +68,14 @@ export default function NewProjectPage() {
   }, [newKeyword, keywords]);
 
   const addCompetitor = useCallback(() => {
-    const val = newCompetitor.trim();
-    if (val && !competitors.includes(val) && competitors.length < 5) {
-      setCompetitors((prev) => [...prev, val]);
-      setNewCompetitor('');
-      competitorInputRef.current?.focus();
-    }
+    const parts = newCompetitor.split(',').map((s) => s.trim()).filter(Boolean);
+    if (parts.length === 0) return;
+    setCompetitors((prev) => {
+      const unique = parts.filter((p) => !prev.includes(p));
+      return [...prev, ...unique].slice(0, 20);
+    });
+    setNewCompetitor('');
+    competitorInputRef.current?.focus();
   }, [newCompetitor, competitors]);
 
   async function handleAiFill() {
@@ -96,7 +98,7 @@ export default function NewProjectPage() {
 
       setIndustry(data.industry || '');
       setKeywords(data.keywords?.slice(0, 10) || []);
-      setCompetitors(data.competitors?.slice(0, 5) || []);
+      setCompetitors(data.competitors?.slice(0, 20) || []);
       setLanguage(data.language || 'it');
       setLocationCode(data.location_code || 2380);
       setSources(data.sources || ['google_organic', 'google_news']);
@@ -426,7 +428,7 @@ export default function NewProjectPage() {
                   <Zap className="w-4 h-4 text-orange" />
                 </div>
                 <h3 className="font-semibold text-primary">Competitor</h3>
-                <span className="text-xs text-muted-foreground">({competitors.length}/5)</span>
+                <span className="text-xs text-muted-foreground">({competitors.length}/20)</span>
                 {aiDone && <AiBadge />}
               </div>
 
@@ -444,7 +446,7 @@ export default function NewProjectPage() {
                 </div>
               )}
 
-              {competitors.length < 5 && (
+              {competitors.length < 20 && (
                 <div className="flex gap-2">
                   <Input
                     ref={competitorInputRef}
@@ -456,7 +458,7 @@ export default function NewProjectPage() {
                         addCompetitor();
                       }
                     }}
-                    placeholder="Aggiungi dominio competitor..."
+                    placeholder="Aggiungi domini separati da virgola, es: dominio1.com, dominio2.it"
                     className="flex-1"
                   />
                   <Button
