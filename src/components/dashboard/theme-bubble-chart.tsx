@@ -45,7 +45,7 @@ export function ThemeBubbleChart({ data }: ThemeBubbleChartProps) {
     );
   }
 
-  const maxCount = Math.max(...data.map((d) => d.count));
+  const maxCount = Math.max(...data.map((d) => d.count), 1);
 
   return (
     <Card className="border-0 shadow-sm rounded-2xl bg-white">
@@ -58,8 +58,10 @@ export function ThemeBubbleChart({ data }: ThemeBubbleChartProps) {
         </div>
         <div className="flex flex-wrap gap-3 justify-center py-4">
           {data.slice(0, 25).map((theme) => {
-            const size = 48 + (theme.count / maxCount) * 72;
-            const color = scoreToColor(theme.sentiment, theme.sentiment_score);
+            const ratio = maxCount > 0 ? theme.count / maxCount : 0;
+            const size = 48 + ratio * 72;
+            const score = theme.sentiment_score ?? 0;
+            const color = scoreToColor(theme.sentiment, score);
 
             return (
               <div
@@ -69,10 +71,10 @@ export function ThemeBubbleChart({ data }: ThemeBubbleChartProps) {
                   width: size,
                   height: size,
                   backgroundColor: color,
-                  opacity: 0.8 + (theme.count / maxCount) * 0.2,
+                  opacity: 0.8 + ratio * 0.2,
                   boxShadow: `0 2px 8px ${color}40`,
                 }}
-                title={`${theme.name}: ${theme.count} occorrenze\nSentiment: ${theme.sentiment} (${theme.sentiment_score >= 0 ? '+' : ''}${theme.sentiment_score.toFixed(2)})`}
+                title={`${theme.name}: ${theme.count} occorrenze\nSentiment: ${theme.sentiment} (${score >= 0 ? '+' : ''}${score.toFixed(2)})`}
               >
                 <span className="truncate px-1.5 text-center leading-tight" style={{ fontSize: Math.max(9, size / 8.5) }}>
                   {theme.name}

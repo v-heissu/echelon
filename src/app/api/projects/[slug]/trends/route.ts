@@ -26,10 +26,28 @@ export async function GET(
 
   if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 });
 
-  // Get all completed scans
+  // Auto-complete any running scans that have all tasks done
+  const { data: runningScans } = await admin
+    .from('scans')
+    .select('id, total_tasks, completed_tasks')
+    .eq('project_id', project.id)
+    .eq('status', 'running');
+
+  if (runningScans) {
+    for (const scan of runningScans) {
+      if (scan.total_tasks > 0 && scan.completed_tasks >= scan.total_tasks) {
+        await admin
+          .from('scans')
+          .update({ status: 'completed', completed_at: new Date().toISOString() })
+          .eq('id', scan.id);
+      }
+    }
+  }
+
+  // Get all completed scans (including just auto-completed ones)
   const { data: scans } = await admin
     .from('scans')
-    .select('id, completed_at')
+    .select('id, completed_at, started_at')
     .eq('project_id', project.id)
     .eq('status', 'completed')
     .order('completed_at', { ascending: true });
