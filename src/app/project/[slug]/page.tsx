@@ -24,6 +24,7 @@ export default function ProjectDashboard() {
   const [themes, setThemes] = useState<{ name: string; count: number; sentiment: string; sentiment_score: number }[]>([]);
   const [loading, setLoading] = useState(true);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const processingRef = useRef(false);
 
   const loadData = useCallback(async () => {
     try {
@@ -51,15 +52,39 @@ export default function ProjectDashboard() {
     }
   }, [slug]);
 
+  // Trigger worker processing from browser when scan is active.
+  // Browser HTTP requests stay alive (unlike serverless fire-and-forget),
+  // so this reliably keeps the worker running.
+  const triggerProcessing = useCallback(async () => {
+    if (processingRef.current) return; // Already running
+    processingRef.current = true;
+    try {
+      await fetch('/api/scans/process', { method: 'POST' });
+    } catch {
+      // Will retry on next poll
+    } finally {
+      processingRef.current = false;
+      // Refresh data after worker batch completes
+      loadData();
+    }
+  }, [loadData]);
+
   useEffect(() => {
     loadData();
   }, [loadData]);
 
-  // Poll every 8s when scan is active, every 30s otherwise
+  // When active scan is detected, trigger processing from browser
+  useEffect(() => {
+    if (!loading && data?.active_scan && !processingRef.current) {
+      triggerProcessing();
+    }
+  }, [loading, data?.active_scan, triggerProcessing]);
+
+  // Poll every 10s when scan is active, every 30s otherwise
   useEffect(() => {
     if (loading) return;
 
-    const pollInterval = data?.active_scan ? 8000 : 30000;
+    const pollInterval = data?.active_scan ? 10000 : 30000;
 
     intervalRef.current = setInterval(() => {
       loadData();
