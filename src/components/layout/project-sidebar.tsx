@@ -48,9 +48,7 @@ export function ProjectSidebar({ slug, projectName, isAdmin }: ProjectSidebarPro
       {/* Logo area */}
       <div className="p-6 pb-5">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-white/10 backdrop-blur-sm flex items-center justify-center ring-1 ring-white/10">
-            <EchelonLogo size={28} />
-          </div>
+          <EchelonLogo size={40} />
           <div className="min-w-0">
             <h1 className="text-[15px] font-bold text-white tracking-wider">ECHELON</h1>
             <p className="text-white/30 text-[10px] font-medium truncate mt-0.5">

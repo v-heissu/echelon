@@ -44,8 +44,8 @@ export default function LoginForm() {
   return (
     <div className="w-full max-w-[420px] animate-fade-in-up">
       <div className="text-center mb-10">
-        <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white/[0.08] backdrop-blur-sm ring-1 ring-white/[0.08] mb-5 animate-float">
-          <EchelonLogo size={40} />
+        <div className="inline-flex items-center justify-center mb-5 animate-float">
+          <EchelonLogo size={80} />
         </div>
         <h1 className="text-3xl font-extrabold text-white tracking-tight">
           ECHELON
