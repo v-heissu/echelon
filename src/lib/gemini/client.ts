@@ -30,10 +30,12 @@ interface AnalysisResult {
   sentiment_score: number;
   entities: { name: string; type: string }[];
   summary: string;
+  is_competitor: boolean;
 }
 
 interface GeminiResponse {
   results: AnalysisResult[];
+  discovered_competitors: string[];
 }
 
 export class GeminiClient {
@@ -65,6 +67,9 @@ Per OGNI risultato, fornisci:
 3. sentiment_score: da -1.0 a 1.0
 4. entities: array di entità rilevanti con tipo (brand, person, product, technology, location)
 5. summary: riassunto in 1-2 frasi del contenuto
+6. is_competitor: true se il dominio sembra appartenere a un competitor nel settore "${industry}", false altrimenti
+
+Inoltre, nel campo "discovered_competitors" a livello root, elenca i domini (solo hostname senza www) che identifichi come competitor nel settore.
 
 Rispondi SOLO con JSON valido, nessun testo prima o dopo.
 Output format:
@@ -75,8 +80,10 @@ Output format:
     "sentiment": "neutral",
     "sentiment_score": 0.0,
     "entities": [{"name": "Entità", "type": "brand"}],
-    "summary": "Riassunto del contenuto..."
-  }]
+    "summary": "Riassunto del contenuto...",
+    "is_competitor": false
+  }],
+  "discovered_competitors": ["domain1.com", "domain2.com"]
 }
 
 KEYWORD: ${keyword}
@@ -126,12 +133,14 @@ ${input.description ? `DESCRIZIONE: ${input.description}` : ''}
 
 Genera:
 1. "industry": la industry/settore più appropriato (una parola o breve frase, es: "fintech", "automotive", "fashion luxury")
-2. "keywords": array di 5-10 keyword strategiche da monitorare nelle SERP. Includi:
+2. "keywords": array di 15-25 keyword strategiche da monitorare nelle SERP. Includi:
    - Il nome del brand/progetto e sue varianti
    - Keyword di settore rilevanti
    - Combinazioni brand + settore
    - Keyword di reputazione (es: "brand recensioni", "brand opinioni")
-3. "competitors": array di 3-5 domini di competitor reali e plausibili nel settore (solo dominio, es: "competitor.com")
+   - Keyword long-tail relative al brand
+   - Keyword informazionali legate al settore
+3. "competitors": array di 8-15 domini di competitor reali e plausibili nel settore (solo dominio, es: "competitor.com"). Includi competitor diretti, indiretti e brand affini
 4. "language": codice lingua più appropriato ("it", "en", "de", "fr", "es")
 5. "location_code": codice DataForSEO per la location (2380=Italia, 2840=USA, 2826=UK, 2276=Germania, 2250=Francia, 2724=Spagna)
 6. "sources": array di fonti SERP consigliate, scegli tra "google_organic" e "google_news"

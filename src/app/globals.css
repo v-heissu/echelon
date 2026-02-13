@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 :root {
-  --background: #EAEAEA;
+  --background: #f0f2f5;
   --foreground: #001437;
 }
 
@@ -14,7 +14,7 @@ body {
 
 @layer base {
   * {
-    border-color: #B2B8C3;
+    border-color: #e2e5ea;
   }
 }
 
@@ -63,12 +63,30 @@ body {
   50% { opacity: 0.6; transform: scale(1.2); }
 }
 
+@keyframes progressPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    max-height: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    max-height: 500px;
+    transform: translateY(0);
+  }
+}
+
 .animate-shimmer {
   background: linear-gradient(
     90deg,
-    #EAEAEA 25%,
-    #d4d8de 37%,
-    #EAEAEA 63%
+    #e8eaed 25%,
+    #dcdfe3 37%,
+    #e8eaed 63%
   );
   background-size: 200% 100%;
   animation: shimmer 1.5s ease-in-out infinite;
@@ -90,6 +108,14 @@ body {
   animation: sparkle 1.5s ease-in-out infinite;
 }
 
+.animate-slide-down {
+  animation: slideDown 0.3s ease-out forwards;
+}
+
+.animate-progress-pulse {
+  animation: progressPulse 2s ease-in-out infinite;
+}
+
 /* Stagger children animations */
 .stagger-children > * {
   opacity: 0;
@@ -106,16 +132,23 @@ body {
 .stagger-children > *:nth-child(9) { animation-delay: 640ms; }
 .stagger-children > *:nth-child(10) { animation-delay: 720ms; }
 
+/* Glass card effect */
+.glass-card {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
+  width: 5px;
 }
 ::-webkit-scrollbar-track {
-  background: #EAEAEA;
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #B2B8C3;
-  border-radius: 3px;
+  background: #c4c8ce;
+  border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
   background: #007AC5;

@@ -78,8 +78,10 @@ export async function GET(
     delta: { total_results: 0, unique_domains: 0, competitor_mentions: 0, avg_sentiment: 0 },
     sentiment_distribution: [],
     top_domains: [],
+    theme_sentiments: [] as { name: string; count: number; sentiment: string; sentiment_score: number }[],
     scan_dates: [],
     active_scan: activeScan ? {
+      id: activeScan.id,
       total_tasks: activeScan.total_tasks,
       completed_tasks: activeScan.completed_tasks,
     } : null,
@@ -160,6 +162,46 @@ export async function GET(
     .sort((a, b) => b.count - a.count)
     .slice(0, 10);
 
+  // Theme sentiments: compute average sentiment per theme from current scan
+  const themeSentiments: { name: string; count: number; sentiment: string; sentiment_score: number }[] = [];
+  {
+    const { data: themeResults } = await admin
+      .from('serp_results')
+      .select('ai_analysis(themes, sentiment, sentiment_score)')
+      .eq('scan_id', currentScanId);
+
+    if (themeResults) {
+      const themeMap = new Map<string, { count: number; scoreSum: number; scoreCount: number; sentiments: Record<string, number> }>();
+      themeResults.forEach((r) => {
+        const analysis = r.ai_analysis as unknown as { themes: { name: string }[]; sentiment: string; sentiment_score: number }[] | null;
+        if (analysis && analysis[0] && analysis[0].themes) {
+          for (const t of analysis[0].themes) {
+            const name = t.name.toLowerCase().trim();
+            const existing = themeMap.get(name) || { count: 0, scoreSum: 0, scoreCount: 0, sentiments: {} };
+            existing.count++;
+            existing.scoreSum += analysis[0].sentiment_score || 0;
+            existing.scoreCount++;
+            const s = analysis[0].sentiment || 'neutral';
+            existing.sentiments[s] = (existing.sentiments[s] || 0) + 1;
+            themeMap.set(name, existing);
+          }
+        }
+      });
+
+      for (const [name, data] of Array.from(themeMap.entries())) {
+        const avgScore = data.scoreCount > 0 ? data.scoreSum / data.scoreCount : 0;
+        const dominantSentiment = Object.entries(data.sentiments).sort((a, b) => b[1] - a[1])[0]?.[0] || 'neutral';
+        themeSentiments.push({
+          name,
+          count: data.count,
+          sentiment: dominantSentiment,
+          sentiment_score: Number(avgScore.toFixed(2)),
+        });
+      }
+      themeSentiments.sort((a, b) => b.count - a.count);
+    }
+  }
+
   // Calculate deltas
   const delta = {
     total_results: previousKpi
@@ -181,8 +223,10 @@ export async function GET(
     delta,
     sentiment_distribution: sentimentTimeline,
     top_domains: topDomains,
+    theme_sentiments: themeSentiments.slice(0, 30),
     scan_dates: allScans?.map((s) => s.completed_at || s.started_at) || [],
     active_scan: activeScan ? {
+      id: activeScan.id,
       total_tasks: activeScan.total_tasks,
       completed_tasks: activeScan.completed_tasks,
     } : null,

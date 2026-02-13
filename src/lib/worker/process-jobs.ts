@@ -8,6 +8,7 @@ export interface ProcessResult {
   status: 'processed' | 'no_jobs' | 'error';
   jobId?: string;
   keyword?: string;
+  source?: string;
   error?: string;
   pendingCount: number;
 }
@@ -87,15 +88,17 @@ export async function processOneJob(): Promise<ProcessResult> {
       job.source,
       language,
       locationCode,
-      20
+      30
     );
 
-    // 5. Extract content for each URL (parallel with concurrency limit)
+    // 5. Extract content only for top 10 URLs (speed optimization)
     const CONCURRENCY = 5;
+    const TOP_EXTRACT = 10;
     const excerpts: (string | null)[] = new Array(serpItems.length).fill(null);
 
-    for (let i = 0; i < serpItems.length; i += CONCURRENCY) {
-      const batch = serpItems.slice(i, i + CONCURRENCY);
+    const toExtract = serpItems.slice(0, TOP_EXTRACT);
+    for (let i = 0; i < toExtract.length; i += CONCURRENCY) {
+      const batch = toExtract.slice(i, i + CONCURRENCY);
       const results = await Promise.allSettled(
         batch.map((item) => extractContent(item.url))
       );
@@ -118,6 +121,7 @@ export async function processOneJob(): Promise<ProcessResult> {
         (c: string) => (item.domain || extractDomain(item.url)).includes(c)
       ),
       excerpt: excerpts[idx] || item.description,
+      ...(item.published_at ? { fetched_at: item.published_at } : {}),
     }));
 
     const { data: savedResults, error: insertError } = await supabase
@@ -140,6 +144,24 @@ export async function processOneJob(): Promise<ProcessResult> {
 
       try {
         const analysis = await gemini.analyzeSerpResults(job.keyword, industry, analysisInput);
+
+        // Auto-discover competitors: mark results identified by AI as competitors
+        const discoveredCompetitors = analysis.discovered_competitors || [];
+        if (discoveredCompetitors.length > 0) {
+          for (const result of savedResults) {
+            const domain = result.domain || extractDomain(result.url);
+            const aiResult = analysis.results.find((a) => a.position === result.position);
+            const isAiCompetitor = aiResult?.is_competitor || discoveredCompetitors.some(
+              (c: string) => domain.includes(c)
+            );
+            if (isAiCompetitor && !result.is_competitor) {
+              await supabase
+                .from('serp_results')
+                .update({ is_competitor: true })
+                .eq('id', result.id);
+            }
+          }
+        }
 
         const analysisData = savedResults.map((r) => {
           const aiResult = analysis.results.find((a) => a.position === r.position);
@@ -185,6 +207,7 @@ export async function processOneJob(): Promise<ProcessResult> {
       status: 'processed',
       jobId: job.id,
       keyword: job.keyword,
+      source: job.source,
       pendingCount: count || 0,
     };
   } catch (error) {
@@ -224,6 +247,7 @@ export async function processOneJob(): Promise<ProcessResult> {
       status: 'error',
       jobId: job.id,
       keyword: job.keyword,
+      source: job.source,
       error: errorMessage,
       pendingCount: count || 0,
     };
@@ -233,19 +257,25 @@ export async function processOneJob(): Promise<ProcessResult> {
 async function updateTags(
   supabase: ReturnType<typeof createAdminClient>,
   projectId: string,
-  results: { themes: { name: string; confidence: number }[] }[]
+  results: { themes: { name: string; confidence: number }[]; sentiment?: string; sentiment_score?: number }[]
 ) {
-  const themeMap = new Map<string, number>();
+  const themeMap = new Map<string, { count: number; sentimentSum: number; sentimentCount: number }>();
 
   for (const result of results) {
     for (const theme of result.themes) {
       const name = theme.name.toLowerCase().trim();
-      themeMap.set(name, (themeMap.get(name) || 0) + 1);
+      const existing = themeMap.get(name) || { count: 0, sentimentSum: 0, sentimentCount: 0 };
+      existing.count++;
+      if (result.sentiment_score !== undefined) {
+        existing.sentimentSum += result.sentiment_score;
+        existing.sentimentCount++;
+      }
+      themeMap.set(name, existing);
     }
   }
 
   const entries = Array.from(themeMap.entries());
-  for (const [name, count] of entries) {
+  for (const [name, data] of entries) {
     const slug = name.replace(/\s+/g, '-').replace(/[^\w-]/g, '');
 
     const { data: existing } = await supabase
@@ -259,7 +289,7 @@ async function updateTags(
       await supabase
         .from('tags')
         .update({
-          count: existing.count + count,
+          count: existing.count + data.count,
           last_seen_at: new Date().toISOString(),
         })
         .eq('id', existing.id);
@@ -268,7 +298,7 @@ async function updateTags(
         project_id: projectId,
         name,
         slug,
-        count,
+        count: data.count,
         last_seen_at: new Date().toISOString(),
       });
     }

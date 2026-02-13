@@ -32,32 +32,51 @@ export function SentimentChart({ data }: SentimentChartProps) {
   }));
 
   return (
-    <Card className="border-0 shadow-md">
+    <Card className="border-0 shadow-sm rounded-2xl bg-white">
       <CardContent className="p-5">
-        <div className="flex items-center gap-2 mb-4">
-          <div className="w-8 h-8 rounded-lg bg-teal/10 flex items-center justify-center">
-            <Activity className="w-4 h-4 text-teal" />
+        <div className="flex items-center gap-2.5 mb-5">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-teal to-teal-light flex items-center justify-center shadow-sm">
+            <Activity className="w-4.5 h-4.5 text-white" />
           </div>
-          <h3 className="font-semibold text-primary">Distribuzione Sentiment</h3>
+          <h3 className="font-semibold text-primary text-[15px]">Distribuzione Sentiment</h3>
         </div>
         <ResponsiveContainer width="100%" height={280}>
           <AreaChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#B2B8C3" strokeOpacity={0.5} />
-            <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#64748b' }} />
-            <YAxis tick={{ fontSize: 11, fill: '#64748b' }} />
+            <defs>
+              <linearGradient id="gradPositive" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#2D6A4F" stopOpacity={0.3}/>
+                <stop offset="95%" stopColor="#2D6A4F" stopOpacity={0.05}/>
+              </linearGradient>
+              <linearGradient id="gradNeutral" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#008996" stopOpacity={0.3}/>
+                <stop offset="95%" stopColor="#008996" stopOpacity={0.05}/>
+              </linearGradient>
+              <linearGradient id="gradMixed" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#FFC76D" stopOpacity={0.3}/>
+                <stop offset="95%" stopColor="#FFC76D" stopOpacity={0.05}/>
+              </linearGradient>
+              <linearGradient id="gradNegative" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#D64641" stopOpacity={0.3}/>
+                <stop offset="95%" stopColor="#D64641" stopOpacity={0.05}/>
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" stroke="#e2e5ea" strokeOpacity={0.8} />
+            <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#8b95a5' }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fontSize: 11, fill: '#8b95a5' }} axisLine={false} tickLine={false} />
             <Tooltip
               contentStyle={{
-                borderRadius: '8px',
+                borderRadius: '12px',
                 border: 'none',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
                 fontSize: '12px',
+                padding: '12px',
               }}
             />
-            <Legend wrapperStyle={{ fontSize: '12px' }} />
-            <Area type="monotone" dataKey="positive" stackId="1" stroke="#2D6A4F" fill="#2D6A4F" fillOpacity={0.8} name="Positivo" />
-            <Area type="monotone" dataKey="neutral" stackId="1" stroke="#008996" fill="#008996" fillOpacity={0.8} name="Neutro" />
-            <Area type="monotone" dataKey="mixed" stackId="1" stroke="#FFC76D" fill="#FFC76D" fillOpacity={0.8} name="Misto" />
-            <Area type="monotone" dataKey="negative" stackId="1" stroke="#D64641" fill="#D64641" fillOpacity={0.8} name="Negativo" />
+            <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
+            <Area type="monotone" dataKey="positive" stackId="1" stroke="#2D6A4F" fill="url(#gradPositive)" strokeWidth={2} name="Positivo" />
+            <Area type="monotone" dataKey="neutral" stackId="1" stroke="#008996" fill="url(#gradNeutral)" strokeWidth={2} name="Neutro" />
+            <Area type="monotone" dataKey="mixed" stackId="1" stroke="#FFC76D" fill="url(#gradMixed)" strokeWidth={2} name="Misto" />
+            <Area type="monotone" dataKey="negative" stackId="1" stroke="#D64641" fill="url(#gradNegative)" strokeWidth={2} name="Negativo" />
           </AreaChart>
         </ResponsiveContainer>
       </CardContent>

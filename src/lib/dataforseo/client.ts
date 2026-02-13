@@ -6,6 +6,7 @@ interface SerpItem {
   title: string;
   description: string;
   domain: string;
+  published_at: string | null;
 }
 
 export class DataForSEOClient {
@@ -27,7 +28,7 @@ export class DataForSEOClient {
     source: SerpSource,
     language: string,
     locationCode: number,
-    depth: number = 20
+    depth: number = 30
   ): Promise<SerpItem[]> {
     const endpoint = source === 'google_organic'
       ? '/serp/google/organic/live/advanced'
@@ -71,6 +72,7 @@ export class DataForSEOClient {
         title: item.title as string || '',
         description: item.description as string || item.snippet as string || '',
         domain: item.domain as string || '',
+        published_at: (item.timestamp as string) || (item.datetime as string) || null,
       }))
       .slice(0, depth);
   }
