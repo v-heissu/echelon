@@ -1,5 +1,3 @@
-import { JSDOM } from 'jsdom';
-import { Readability } from '@mozilla/readability';
 import * as cheerio from 'cheerio';
 
 const MAX_EXCERPT_LENGTH = 2000;
@@ -26,16 +24,10 @@ export async function extractContent(url: string): Promise<string | null> {
 
     const html = await response.text();
 
-    // Try Readability first
-    const readabilityResult = tryReadability(html, url);
-    if (readabilityResult) {
-      return readabilityResult.slice(0, MAX_EXCERPT_LENGTH);
-    }
-
-    // Fallback to Cheerio
-    const cheerioResult = tryCheerio(html);
-    if (cheerioResult) {
-      return cheerioResult.slice(0, MAX_EXCERPT_LENGTH);
+    // Extract content using Cheerio (lightweight, Vercel-compatible)
+    const result = extractWithCheerio(html);
+    if (result) {
+      return result.slice(0, MAX_EXCERPT_LENGTH);
     }
 
     return null;
@@ -44,20 +36,12 @@ export async function extractContent(url: string): Promise<string | null> {
   }
 }
 
-function tryReadability(html: string, url: string): string | null {
-  try {
-    const dom = new JSDOM(html, { url });
-    const reader = new Readability(dom.window.document);
-    const article = reader.parse();
-    return article?.textContent?.trim() || null;
-  } catch {
-    return null;
-  }
-}
-
-function tryCheerio(html: string): string | null {
+function extractWithCheerio(html: string): string | null {
   try {
     const $ = cheerio.load(html);
+
+    // Remove script, style, nav, footer, header, aside elements
+    $('script, style, nav, footer, header, aside, .nav, .footer, .header, .sidebar, .ad, .ads, .cookie, .banner').remove();
 
     // Get meta description
     const metaDesc =
@@ -65,16 +49,42 @@ function tryCheerio(html: string): string | null {
       $('meta[property="og:description"]').attr('content') ||
       '';
 
-    // Get first 3 paragraphs
+    // Try to find article/main content first
+    const contentSelectors = ['article', 'main', '[role="main"]', '.post-content', '.article-content', '.entry-content', '.content'];
+    let contentSelector = 'body';
+
+    for (const selector of contentSelectors) {
+      const el = $(selector);
+      if (el.length > 0 && el.text().trim().length > 200) {
+        contentSelector = selector;
+        break;
+      }
+    }
+
+    const contentArea = $(contentSelector);
+
+    // Get paragraphs from content area
     const paragraphs: string[] = [];
-    $('article p, main p, .content p, p').each((i, el) => {
-      if (paragraphs.length < 3) {
+    contentArea.find('p').each((_i, el) => {
+      if (paragraphs.length < 8) {
         const text = $(el).text().trim();
-        if (text.length > 50) {
+        if (text.length > 40) {
           paragraphs.push(text);
         }
       }
     });
+
+    // If no paragraphs found, try headings + any text
+    if (paragraphs.length === 0) {
+      contentArea.find('h1, h2, h3, li, td, dd').each((_i, el) => {
+        if (paragraphs.length < 5) {
+          const text = $(el).text().trim();
+          if (text.length > 30) {
+            paragraphs.push(text);
+          }
+        }
+      });
+    }
 
     const combined = [metaDesc, ...paragraphs].filter(Boolean).join('\n\n');
     return combined || null;
