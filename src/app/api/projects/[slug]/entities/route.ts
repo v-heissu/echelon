@@ -24,16 +24,34 @@ export async function GET(
   const type = searchParams.get('type') || 'brand';
   const scanId = searchParams.get('scan_id');
 
-  let query = admin
-    .from('serp_results')
-    .select('keyword, domain, url, ai_analysis(entities, sentiment, sentiment_score), scans!inner(project_id)')
-    .eq('scans.project_id', project.id);
+  let results;
 
   if (scanId) {
-    query = query.eq('scan_id', scanId);
-  }
+    // Direct scan_id filter
+    const { data } = await admin
+      .from('serp_results')
+      .select('keyword, domain, url, ai_analysis(entities, sentiment, sentiment_score)')
+      .eq('scan_id', scanId);
+    results = data;
+  } else {
+    // Get all scan IDs for this project, then filter serp_results
+    const { data: scans } = await admin
+      .from('scans')
+      .select('id')
+      .eq('project_id', project.id)
+      .in('status', ['completed', 'running']);
 
-  const { data: results } = await query;
+    if (!scans || scans.length === 0) {
+      return NextResponse.json({ entities: [] });
+    }
+
+    const scanIds = scans.map((s: { id: string }) => s.id);
+    const { data } = await admin
+      .from('serp_results')
+      .select('keyword, domain, url, ai_analysis(entities, sentiment, sentiment_score)')
+      .in('scan_id', scanIds);
+    results = data;
+  }
 
   if (!results || results.length === 0) {
     return NextResponse.json({ entities: [] });
@@ -48,8 +66,8 @@ export async function GET(
   }>();
 
   for (const r of results) {
-    const analysis = r.ai_analysis as unknown as { entities: { name: string; type: string }[]; sentiment_score: number }[];
-    const a = Array.isArray(analysis) ? analysis[0] : analysis;
+    const raw = r.ai_analysis;
+    const a = Array.isArray(raw) ? raw[0] : raw;
     if (!a?.entities) continue;
 
     for (const entity of a.entities) {
