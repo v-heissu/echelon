@@ -7,7 +7,7 @@ import { SentimentChart } from '@/components/dashboard/sentiment-chart';
 import { DomainBarChart } from '@/components/dashboard/domain-bar-chart';
 import { ThemeBubbleChart } from '@/components/dashboard/theme-bubble-chart';
 import { PublicationTimeline } from '@/components/dashboard/publication-timeline';
-import { BarChart3, Loader2, AlertTriangle, ChevronDown, ChevronUp, CheckCircle2, XCircle, Clock, Timer, Zap } from 'lucide-react';
+import { BarChart3, Loader2, AlertTriangle, ChevronDown, ChevronUp, CheckCircle2, XCircle, Clock, Timer, Zap, RotateCcw } from 'lucide-react';
 
 interface DashboardData {
   kpi: { total_results: number; unique_domains: number; competitor_mentions: number; avg_sentiment: number };
@@ -71,6 +71,7 @@ export default function ProjectDashboard() {
   const [jobDetails, setJobDetails] = useState<ScanJob[]>([]);
   const [showJobDetails, setShowJobDetails] = useState(false);
   const [processedKeywords, setProcessedKeywords] = useState<{ keyword: string; source: string; status: 'ok' | 'error' }[]>([]);
+  const [resetting, setResetting] = useState(false);
   const processingRef = useRef(false);
   const mountedRef = useRef(true);
   const scanIdRef = useRef<string | null>(null);
@@ -95,6 +96,26 @@ export default function ProjectDashboard() {
       if (mountedRef.current) setLoading(false);
     }
   }, [slug]);
+
+  const resetAndRestart = useCallback(async () => {
+    setResetting(true);
+    try {
+      const res = await fetch('/api/scans/reset', { method: 'POST' });
+      if (res.ok) {
+        const { reset_count } = await res.json();
+        console.log(`[reset] ${reset_count} job resettati`);
+      }
+      processingRef.current = false;
+      setProcessingStatus(null);
+      setProcessingError(null);
+      setProcessedKeywords([]);
+      await loadData();
+    } catch {
+      // ignore
+    } finally {
+      if (mountedRef.current) setResetting(false);
+    }
+  }, [loadData]);
 
   // Poll scan status (lightweight) for progress bar updates
   // Uses functional setState to avoid stale closure on `data`
@@ -313,9 +334,19 @@ export default function ProjectDashboard() {
                   <span className="text-sm font-semibold text-primary">
                     Scan in corso
                   </span>
-                  <span className="text-sm font-bold text-accent tabular-nums">
-                    {activeScan ? `${activeScan.completed_tasks}/${activeScan.total_tasks}` : ''} ({scanProgress}%)
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-bold text-accent tabular-nums">
+                      {activeScan ? `${activeScan.completed_tasks}/${activeScan.total_tasks}` : ''} ({scanProgress}%)
+                    </span>
+                    <button
+                      onClick={resetAndRestart}
+                      disabled={resetting}
+                      title="Reset worker bloccati e riavvia"
+                      className="p-1 rounded-lg hover:bg-[#f0f2f5] text-muted-foreground hover:text-primary transition-colors disabled:opacity-50"
+                    >
+                      <RotateCcw className={`h-3.5 w-3.5 ${resetting ? 'animate-spin' : ''}`} />
+                    </button>
+                  </div>
                 </div>
                 {processingStatus && (
                   <p className="text-xs text-muted-foreground mt-0.5 truncate">{processingStatus}</p>
