@@ -59,7 +59,7 @@ function formatElapsed(startedAt: string | null): string {
   return `${min}m ${sec}s`;
 }
 
-const PARALLEL_WORKERS = 5;
+const POLL_EVERY_N_JOBS = 5;
 
 export default function ProjectDashboard() {
   const params = useParams();
@@ -163,7 +163,7 @@ export default function ProjectDashboard() {
     }
   }, []);
 
-  // Process jobs with parallel workers
+  // Process jobs sequentially (one at a time to avoid rate limits)
   const processJobsLoop = useCallback(async () => {
     if (processingRef.current) return;
     processingRef.current = true;
@@ -175,57 +175,44 @@ export default function ProjectDashboard() {
 
     let totalProcessed = 0;
     let consecutiveErrors = 0;
-    let allDone = false;
 
-    while (mountedRef.current && !allDone) {
-      // Launch parallel workers
-      const promises = Array.from({ length: PARALLEL_WORKERS }, () => processOne());
-      const results = await Promise.all(promises);
+    while (mountedRef.current) {
+      const result = await processOne();
+      if (!result || !mountedRef.current) break;
 
-      for (const result of results) {
-        if (!result || !mountedRef.current) continue;
-
-        if (result.status === 'processed') {
-          totalProcessed++;
-          consecutiveErrors = 0;
+      if (result.status === 'processed') {
+        totalProcessed++;
+        consecutiveErrors = 0;
+        if (mountedRef.current) {
+          const keyword = result.keyword || '';
+          const source = result.source === 'google_organic' ? 'Web' : 'News';
+          setProcessingStatus(`${totalProcessed} task completati — ultimo: ${keyword} (${source})`);
+          setProcessingError(null);
+          setProcessedKeywords(prev => [
+            ...prev,
+            { keyword: result.keyword || '', source: result.source || '', status: 'ok' },
+          ]);
+        }
+      } else if (result.status === 'error') {
+        consecutiveErrors++;
+        if (mountedRef.current) {
+          setProcessedKeywords(prev => [
+            ...prev,
+            { keyword: result.keyword || '?', source: result.source || '', status: 'error' },
+          ]);
+        }
+        if (consecutiveErrors >= 8) {
           if (mountedRef.current) {
-            const keyword = result.keyword || '';
-            const source = result.source === 'google_organic' ? 'Web' : 'News';
-            setProcessingStatus(`${totalProcessed} task completati — ultimo: ${keyword} (${source})`);
-            setProcessingError(null);
-            setProcessedKeywords(prev => [
-              ...prev,
-              { keyword: result.keyword || '', source: result.source || '', status: 'ok' },
-            ]);
+            setProcessingError(`Troppi errori consecutivi. Ultimo: ${result.error}`);
           }
-        } else if (result.status === 'error') {
-          consecutiveErrors++;
-          if (mountedRef.current) {
-            setProcessedKeywords(prev => [
-              ...prev,
-              { keyword: result.keyword || '?', source: result.source || '', status: 'error' },
-            ]);
-          }
-          if (consecutiveErrors >= 8) {
-            if (mountedRef.current) {
-              setProcessingError(`Troppi errori consecutivi. Ultimo: ${result.error}`);
-            }
-            allDone = true;
-            break;
-          }
-        } else if (result.status === 'no_jobs') {
-          allDone = true;
           break;
         }
-
-        if (result.pendingCount === 0) {
-          allDone = true;
-          break;
-        }
+      } else if (result.status === 'no_jobs' || result.pendingCount === 0) {
+        break;
       }
 
-      // Refresh progress every batch
-      if (mountedRef.current && !allDone) {
+      // Refresh progress periodically
+      if (mountedRef.current && totalProcessed % POLL_EVERY_N_JOBS === 0) {
         pollScanStatus();
       }
     }
