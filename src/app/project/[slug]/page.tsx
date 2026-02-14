@@ -59,7 +59,7 @@ function formatElapsed(startedAt: string | null): string {
   return `${min}m ${sec}s`;
 }
 
-const PARALLEL_WORKERS = 3;
+const PARALLEL_WORKERS = 5;
 
 export default function ProjectDashboard() {
   const params = useParams();
