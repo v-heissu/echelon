@@ -120,7 +120,7 @@ ${JSON.stringify(results, null, 2)}`;
           throw error;
         }
         // Wait before retry
-        await new Promise((resolve) => setTimeout(resolve, 1000 * (attempt + 1)));
+        await new Promise((resolve) => setTimeout(resolve, 500 * (attempt + 1)));
       }
     }
 
@@ -189,7 +189,7 @@ Output format:
         if (attempt === maxRetries - 1) {
           throw error;
         }
-        await new Promise((resolve) => setTimeout(resolve, 1000 * (attempt + 1)));
+        await new Promise((resolve) => setTimeout(resolve, 500 * (attempt + 1)));
       }
     }
 

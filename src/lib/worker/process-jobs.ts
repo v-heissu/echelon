@@ -92,21 +92,17 @@ export async function processOneJob(): Promise<ProcessResult> {
       30
     );
 
-    // 5. Extract content only for top 10 URLs (speed optimization)
-    const CONCURRENCY = 5;
+    // 5. Extract content for top 10 URLs (all in parallel for speed)
     const TOP_EXTRACT = 10;
     const excerpts: (string | null)[] = new Array(serpItems.length).fill(null);
 
     const toExtract = serpItems.slice(0, TOP_EXTRACT);
-    for (let i = 0; i < toExtract.length; i += CONCURRENCY) {
-      const batch = toExtract.slice(i, i + CONCURRENCY);
-      const results = await Promise.allSettled(
-        batch.map((item) => extractContent(item.url))
-      );
-      results.forEach((result, idx) => {
-        excerpts[i + idx] = result.status === 'fulfilled' ? result.value : null;
-      });
-    }
+    const extractResults = await Promise.allSettled(
+      toExtract.map((item) => extractContent(item.url))
+    );
+    extractResults.forEach((result, idx) => {
+      excerpts[idx] = result.status === 'fulfilled' ? result.value : null;
+    });
 
     // 6. Save SERP results
     const serpData = serpItems.map((item, idx) => ({
