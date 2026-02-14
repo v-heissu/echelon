@@ -6,6 +6,7 @@ import { KPICards } from '@/components/dashboard/kpi-cards';
 import { SentimentChart } from '@/components/dashboard/sentiment-chart';
 import { DomainBarChart } from '@/components/dashboard/domain-bar-chart';
 import { ThemeBubbleChart } from '@/components/dashboard/theme-bubble-chart';
+import { PublicationTimeline } from '@/components/dashboard/publication-timeline';
 import { BarChart3, Loader2, AlertTriangle, ChevronDown, ChevronUp, CheckCircle2, XCircle, Clock } from 'lucide-react';
 
 interface DashboardData {
@@ -14,6 +15,7 @@ interface DashboardData {
   sentiment_distribution: { date: string; positive: number; negative: number; neutral: number; mixed: number }[];
   top_domains: { domain: string; count: number; is_competitor: boolean }[];
   theme_sentiments: { name: string; count: number; sentiment: string; sentiment_score: number }[];
+  publication_timeline: { date: string; count: number }[];
   scan_dates: string[];
   active_scan: { id: string; total_tasks: number; completed_tasks: number } | null;
 }
@@ -380,6 +382,10 @@ export default function ProjectDashboard() {
       </div>
 
       <ThemeBubbleChart data={themes} />
+
+      {data.publication_timeline && data.publication_timeline.length > 0 && (
+        <PublicationTimeline data={data.publication_timeline} />
+      )}
     </div>
   );
 }

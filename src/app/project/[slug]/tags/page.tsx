@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tag as TagType } from '@/types/database';
-import { Tag, Trophy } from 'lucide-react';
+import { Tag, Trophy, RefreshCw } from 'lucide-react';
 
 export default function TagsPage() {
   const params = useParams();
@@ -12,15 +12,34 @@ export default function TagsPage() {
   const router = useRouter();
   const [tags, setTags] = useState<TagType[]>([]);
   const [loading, setLoading] = useState(true);
+  const [rebuilding, setRebuilding] = useState(false);
+
+  const loadTags = useCallback(async () => {
+    const res = await fetch(`/api/projects/${slug}/tags`);
+    if (res.ok) setTags(await res.json());
+  }, [slug]);
 
   useEffect(() => {
     async function load() {
-      const res = await fetch(`/api/projects/${slug}/tags`);
-      if (res.ok) setTags(await res.json());
+      await loadTags();
       setLoading(false);
     }
     load();
-  }, [slug]);
+  }, [loadTags]);
+
+  async function handleRebuild() {
+    setRebuilding(true);
+    try {
+      const res = await fetch(`/api/projects/${slug}/tags`, { method: 'POST' });
+      if (res.ok) {
+        const data = await res.json();
+        setTags(data.tags || []);
+      }
+    } catch {
+      // ignore
+    }
+    setRebuilding(false);
+  }
 
   if (loading) {
     return (
@@ -39,9 +58,19 @@ export default function TagsPage() {
 
   return (
     <div className="space-y-6 animate-fade-in-up">
-      <div>
-        <h1 className="text-2xl font-bold text-primary">Tag Cloud</h1>
-        <p className="text-sm text-muted-foreground mt-1">{tags.length} temi identificati</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-primary">Tag Cloud</h1>
+          <p className="text-sm text-muted-foreground mt-1">{tags.length} temi identificati</p>
+        </div>
+        <button
+          onClick={handleRebuild}
+          disabled={rebuilding}
+          className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-medium bg-accent/10 text-accent hover:bg-accent/20 transition-all duration-200 disabled:opacity-50"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${rebuilding ? 'animate-spin' : ''}`} />
+          {rebuilding ? 'Ricostruzione...' : 'Ricostruisci Tag'}
+        </button>
       </div>
 
       <Card className="border-0 shadow-md">
@@ -77,7 +106,15 @@ export default function TagsPage() {
               <div className="w-12 h-12 rounded-xl bg-teal/10 flex items-center justify-center mx-auto mb-3">
                 <Tag className="h-6 w-6 text-teal" />
               </div>
-              <p className="text-sm text-muted-foreground">Nessun tag disponibile. Avvia una scan con analisi AI.</p>
+              <p className="text-sm text-muted-foreground mb-3">Nessun tag disponibile. Avvia una scan con analisi AI.</p>
+              <button
+                onClick={handleRebuild}
+                disabled={rebuilding}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-medium bg-accent/10 text-accent hover:bg-accent/20 transition-all duration-200 disabled:opacity-50"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${rebuilding ? 'animate-spin' : ''}`} />
+                {rebuilding ? 'Ricostruzione...' : 'Forza ricostruzione da analisi AI'}
+              </button>
             </div>
           )}
         </CardContent>

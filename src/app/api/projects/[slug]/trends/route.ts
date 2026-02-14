@@ -45,15 +45,26 @@ export async function GET(
   }
 
   // Get all completed scans (including just auto-completed ones)
-  const { data: scans } = await admin
+  let { data: scans } = await admin
     .from('scans')
     .select('id, completed_at, started_at')
     .eq('project_id', project.id)
     .eq('status', 'completed')
     .order('completed_at', { ascending: true });
 
+  // Also include running scans with data if no completed scans
   if (!scans || scans.length === 0) {
-    return NextResponse.json({ trends: [], timeline: [] });
+    const { data: runningWithData } = await admin
+      .from('scans')
+      .select('id, completed_at, started_at')
+      .eq('project_id', project.id)
+      .eq('status', 'running')
+      .order('started_at', { ascending: true });
+
+    if (!runningWithData || runningWithData.length === 0) {
+      return NextResponse.json({ trends: [], timeline: [] });
+    }
+    scans = runningWithData.map(s => ({ ...s, completed_at: s.completed_at || s.started_at }));
   }
 
   // Calculate theme density per scan
@@ -69,13 +80,14 @@ export async function GET(
     const themeCounts = new Map<string, number>();
 
     results?.forEach((r) => {
-      const analysis = r.ai_analysis as unknown as { themes: { name: string }[] }[];
-      if (analysis?.[0]?.themes) {
-        analysis[0].themes.forEach((t) => {
-          if (!t.name) return;
+      const raw = r.ai_analysis;
+      const a = Array.isArray(raw) ? raw[0] : raw;
+      if (a?.themes) {
+        for (const t of a.themes) {
+          if (!t.name) continue;
           const name = t.name.toLowerCase().trim();
           themeCounts.set(name, (themeCounts.get(name) || 0) + 1);
-        });
+        }
       }
     });
 

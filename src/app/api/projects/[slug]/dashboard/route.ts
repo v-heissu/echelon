@@ -79,6 +79,7 @@ export async function GET(
     sentiment_distribution: [],
     top_domains: [],
     theme_sentiments: [] as { name: string; count: number; sentiment: string; sentiment_score: number }[],
+    publication_timeline: [] as { date: string; count: number }[],
     scan_dates: [],
     active_scan: activeScan ? {
       id: activeScan.id,
@@ -130,9 +131,10 @@ export async function GET(
 
       const counts = { positive: 0, negative: 0, neutral: 0, mixed: 0 };
       analyses.forEach((r) => {
-        const analysis = r.ai_analysis as unknown as { sentiment: string }[] | null;
-        if (analysis && analysis[0]) {
-          const s = analysis[0].sentiment as keyof typeof counts;
+        const raw = r.ai_analysis;
+        const a = Array.isArray(raw) ? raw[0] : raw;
+        if (a?.sentiment) {
+          const s = a.sentiment as keyof typeof counts;
           if (s in counts) counts[s]++;
         }
       });
@@ -173,16 +175,17 @@ export async function GET(
     if (themeResults) {
       const themeMap = new Map<string, { count: number; scoreSum: number; scoreCount: number; sentiments: Record<string, number> }>();
       themeResults.forEach((r) => {
-        const analysis = r.ai_analysis as unknown as { themes: { name: string }[]; sentiment: string; sentiment_score: number }[] | null;
-        if (analysis && analysis[0] && analysis[0].themes) {
-          for (const t of analysis[0].themes) {
+        const raw = r.ai_analysis;
+        const a = Array.isArray(raw) ? raw[0] : raw;
+        if (a?.themes) {
+          for (const t of a.themes) {
             if (!t.name) continue;
             const name = t.name.toLowerCase().trim();
             const existing = themeMap.get(name) || { count: 0, scoreSum: 0, scoreCount: 0, sentiments: {} };
             existing.count++;
-            existing.scoreSum += analysis[0].sentiment_score || 0;
+            existing.scoreSum += a.sentiment_score || 0;
             existing.scoreCount++;
-            const s = analysis[0].sentiment || 'neutral';
+            const s = a.sentiment || 'neutral';
             existing.sentiments[s] = (existing.sentiments[s] || 0) + 1;
             themeMap.set(name, existing);
           }
@@ -200,6 +203,33 @@ export async function GET(
         });
       }
       themeSentiments.sort((a, b) => b.count - a.count);
+    }
+  }
+
+  // Publication timeline: count articles by published date (fetched_at)
+  const publicationTimeline: { date: string; count: number }[] = [];
+  {
+    // Get all scan IDs for this project
+    const projectScanIds = allScans?.map((s) => s.id) || [];
+    if (projectScanIds.length > 0) {
+      const { data: articleDates } = await admin
+        .from('serp_results')
+        .select('fetched_at')
+        .in('scan_id', projectScanIds);
+
+      if (articleDates && articleDates.length > 0) {
+        const dateCounts = new Map<string, number>();
+        articleDates.forEach((r) => {
+          if (!r.fetched_at) return;
+          const day = r.fetched_at.substring(0, 10); // YYYY-MM-DD
+          dateCounts.set(day, (dateCounts.get(day) || 0) + 1);
+        });
+
+        const sorted = Array.from(dateCounts.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+        for (const [date, count] of sorted) {
+          publicationTimeline.push({ date, count });
+        }
+      }
     }
   }
 
@@ -225,6 +255,7 @@ export async function GET(
     sentiment_distribution: sentimentTimeline,
     top_domains: topDomains,
     theme_sentiments: themeSentiments.slice(0, 30),
+    publication_timeline: publicationTimeline,
     scan_dates: allScans?.map((s) => s.completed_at || s.started_at) || [],
     active_scan: activeScan ? {
       id: activeScan.id,
@@ -248,9 +279,10 @@ async function getScanKPIs(client: any, scanId: string) {
   let sentimentSum = 0;
   let sentimentCount = 0;
   results?.forEach((r: { ai_analysis: unknown }) => {
-    const analysis = r.ai_analysis as { sentiment_score: number }[] | null;
-    if (analysis && analysis[0]) {
-      sentimentSum += analysis[0].sentiment_score;
+    const raw = r.ai_analysis;
+    const a = Array.isArray(raw) ? raw[0] : raw;
+    if (a?.sentiment_score != null) {
+      sentimentSum += a.sentiment_score;
       sentimentCount++;
     }
   });
