@@ -168,7 +168,10 @@ export async function processOneJob(): Promise<ProcessResult> {
           const aiResult = analysis.results.find((a) => a.position === r.position);
           return {
             serp_result_id: r.id,
-            themes: aiResult?.themes || [],
+            themes: (aiResult?.themes || []).map((t: { name?: string; confidence?: number }) => ({
+              name: t.name || '',
+              confidence: typeof t.confidence === 'number' && !isNaN(t.confidence) ? t.confidence : 0.5,
+            })),
             sentiment: aiResult?.sentiment || 'neutral',
             sentiment_score: aiResult?.sentiment_score || 0,
             entities: aiResult?.entities || [],

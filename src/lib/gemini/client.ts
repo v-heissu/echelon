@@ -71,7 +71,7 @@ export class GeminiClient {
     const prompt = `Sei un analista di intelligence competitiva. Analizza i seguenti risultati SERP e il contenuto estratto dalle pagine.
 
 Per OGNI risultato, fornisci:
-1. themes: array di 1-5 temi principali (normalizzati in lowercase, singolare)
+1. themes: array di 1-5 temi principali, ognuno con "name" (stringa, lowercase, singolare) e "confidence" (numero da 0.0 a 1.0 che indica la rilevanza del tema)
 2. sentiment: positive | negative | neutral | mixed
 3. sentiment_score: da -1.0 a 1.0
 4. entities: array di entità rilevanti con tipo (brand, person, product, technology, location)
