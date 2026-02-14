@@ -190,7 +190,7 @@ export function ResultsTable({ results, onTagClick }: ResultsTableProps) {
                                   className="inline-block bg-accent/10 text-accent text-xs px-2.5 py-1 rounded-full cursor-pointer hover:bg-accent/20 transition-colors font-medium"
                                   onClick={() => onTagClick?.(t.name)}
                                 >
-                                  {t.name} ({(t.confidence * 100).toFixed(0)}%)
+                                  {t.name}{typeof t.confidence === 'number' && !isNaN(t.confidence) ? ` (${(t.confidence * 100).toFixed(0)}%)` : ''}
                                 </span>
                               ))}
                             </div>
