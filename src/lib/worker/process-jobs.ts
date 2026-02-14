@@ -262,9 +262,11 @@ async function updateTags(
   const themeMap = new Map<string, { count: number; sentimentSum: number; sentimentCount: number }>();
 
   for (const result of results) {
+    if (!result.themes || !Array.isArray(result.themes)) continue;
     for (const theme of result.themes) {
       if (!theme.name) continue;
       const name = theme.name.toLowerCase().trim();
+      if (!name) continue;
       const existing = themeMap.get(name) || { count: 0, sentimentSum: 0, sentimentCount: 0 };
       existing.count++;
       if (result.sentiment_score !== undefined) {
@@ -275,33 +277,52 @@ async function updateTags(
     }
   }
 
+  if (themeMap.size === 0) {
+    console.log('[updateTags] No themes found in results');
+    return;
+  }
+
+  console.log('[updateTags] Updating', themeMap.size, 'tags for project', projectId);
+
   const entries = Array.from(themeMap.entries());
   for (const [name, data] of entries) {
     const slug = name.replace(/\s+/g, '-').replace(/[^\w-]/g, '');
 
-    const { data: existing } = await supabase
+    // Use maybeSingle() to avoid error when no row matches
+    const { data: existing, error: lookupError } = await supabase
       .from('tags')
       .select('id, count')
       .eq('project_id', projectId)
       .eq('slug', slug)
-      .single();
+      .maybeSingle();
+
+    if (lookupError) {
+      console.error('[updateTags] Lookup error for', name, ':', lookupError.message);
+      continue;
+    }
 
     if (existing) {
-      await supabase
+      const { error: updateError } = await supabase
         .from('tags')
         .update({
           count: existing.count + data.count,
           last_seen_at: new Date().toISOString(),
         })
         .eq('id', existing.id);
+      if (updateError) {
+        console.error('[updateTags] Update error for', name, ':', updateError.message);
+      }
     } else {
-      await supabase.from('tags').insert({
+      const { error: insertError } = await supabase.from('tags').insert({
         project_id: projectId,
         name,
         slug,
         count: data.count,
         last_seen_at: new Date().toISOString(),
       });
+      if (insertError) {
+        console.error('[updateTags] Insert error for', name, ':', insertError.message);
+      }
     }
   }
 }

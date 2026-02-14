@@ -109,6 +109,10 @@ export default function ProjectDashboard() {
       const res = await fetch('/api/scans/process', { method: 'POST' });
       if (!res.ok) {
         const errData = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+        // If auth/forbidden error, return special status to stop loop immediately
+        if (res.status === 401 || res.status === 403) {
+          return { status: 'no_jobs', error: errData.detail || errData.error, pendingCount: 0 };
+        }
         return { status: 'error', error: errData.detail || errData.error, pendingCount: -1 };
       }
       return await res.json();
