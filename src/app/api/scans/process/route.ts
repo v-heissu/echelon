@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase/server';
-import { createAdminClient } from '@/lib/supabase/admin';
 import { processOneJob, type ProcessResult } from '@/lib/worker/process-jobs';
 
 export const maxDuration = 60;
 
 export async function POST() {
-  // Authenticate via session (browser call)
+  // Authenticate via session (browser call) - any authenticated user can process queued jobs
+  // Security: only admins can START scans (create jobs), processing just executes the queue
   try {
     const supabase = createServerSupabase();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -15,20 +15,6 @@ export async function POST() {
       return NextResponse.json(
         { error: 'Unauthorized', detail: authError?.message || 'No user session' },
         { status: 401 }
-      );
-    }
-
-    const admin = createAdminClient();
-    const { data: profile, error: profileError } = await admin
-      .from('users')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (profileError || profile?.role !== 'admin') {
-      return NextResponse.json(
-        { error: 'Forbidden', detail: profileError?.message || 'Not admin' },
-        { status: 403 }
       );
     }
   } catch (error) {
