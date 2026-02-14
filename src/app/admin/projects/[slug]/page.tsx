@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Trash2, UserPlus, Settings, Users, Save, Loader2 } from 'lucide-react';
+import { Trash2, UserPlus, Settings, Users, Save, Loader2, CheckCircle2, XCircle, AlertTriangle, X, Plus } from 'lucide-react';
 import { Project, User } from '@/types/database';
 
 export default function EditProjectPage() {
@@ -18,6 +18,12 @@ export default function EditProjectPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [project, setProject] = useState<Project | null>(null);
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  function showToast(type: 'success' | 'error', message: string) {
+    setToast({ type, message });
+    setTimeout(() => setToast(null), 3000);
+  }
   const [projectUsers, setProjectUsers] = useState<{ user_id: string; role: string; users: User }[]>([]);
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [selectedUserId, setSelectedUserId] = useState('');
@@ -32,7 +38,9 @@ export default function EditProjectPage() {
     language: 'it',
     location_code: 2380,
     is_active: true,
+    alert_keywords: [] as string[],
   });
+  const [newAlertKw, setNewAlertKw] = useState('');
 
   const loadProject = useCallback(async () => {
     const res = await fetch(`/api/admin/projects/${slug}`);
@@ -50,6 +58,7 @@ export default function EditProjectPage() {
         language: data.language,
         location_code: data.location_code,
         is_active: data.is_active,
+        alert_keywords: Array.isArray(data.alert_keywords) ? data.alert_keywords : [],
       });
     }
     setLoading(false);
@@ -79,14 +88,15 @@ export default function EditProjectPage() {
         ...form,
         keywords: form.keywords.split('\n').map((k) => k.trim()).filter(Boolean),
         competitors: form.competitors.split(/[\n,]/).map((c) => c.trim()).filter(Boolean).slice(0, 20),
+        alert_keywords: form.alert_keywords,
       }),
     });
 
     if (res.ok) {
-      alert('Progetto aggiornato');
+      showToast('success', 'Progetto aggiornato con successo');
     } else {
       const data = await res.json();
-      alert('Errore: ' + data.error);
+      showToast('error', 'Errore: ' + data.error);
     }
     setSaving(false);
   }
@@ -109,25 +119,41 @@ export default function EditProjectPage() {
 
   async function addUser() {
     if (!selectedUserId) return;
-    const res = await fetch(`/api/admin/projects/${slug}/users`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_id: selectedUserId, role: 'viewer' }),
-    });
-    if (res.ok) {
-      loadProject();
-      setSelectedUserId('');
+    try {
+      const res = await fetch(`/api/admin/projects/${slug}/users`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: selectedUserId, role: 'viewer' }),
+      });
+      if (res.ok) {
+        showToast('success', 'Utente aggiunto al progetto');
+        loadProject();
+        setSelectedUserId('');
+      } else {
+        const data = await res.json();
+        showToast('error', 'Errore: ' + data.error);
+      }
+    } catch {
+      showToast('error', 'Errore di rete');
     }
   }
 
   async function removeUser(userId: string) {
-    const res = await fetch(`/api/admin/projects/${slug}/users`, {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_id: userId }),
-    });
-    if (res.ok) {
-      loadProject();
+    try {
+      const res = await fetch(`/api/admin/projects/${slug}/users`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId }),
+      });
+      if (res.ok) {
+        showToast('success', 'Utente rimosso dal progetto');
+        loadProject();
+      } else {
+        const data = await res.json();
+        showToast('error', 'Errore: ' + data.error);
+      }
+    } catch {
+      showToast('error', 'Errore di rete');
     }
   }
 
@@ -264,6 +290,70 @@ export default function EditProjectPage() {
               <label className="text-sm font-medium text-primary">Progetto attivo</label>
             </div>
 
+            {/* Alert Keywords */}
+            <div className="p-4 rounded-xl border border-orange/20 bg-orange/5">
+              <div className="flex items-center gap-2 mb-2">
+                <AlertTriangle className="w-4 h-4 text-orange" />
+                <label className="text-sm font-semibold text-primary">Alert Semantici</label>
+                <span className="text-xs text-muted-foreground">({form.alert_keywords.length}/15)</span>
+              </div>
+              <p className="text-xs text-muted-foreground mb-3">
+                Particelle che, se riconosciute dall&apos;AI, segnano il risultato come alta priorita.
+              </p>
+              {form.alert_keywords.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mb-3">
+                  {form.alert_keywords.map((ak) => (
+                    <span key={ak} className="inline-flex items-center gap-1 pl-2.5 pr-1 py-0.5 rounded-full text-xs font-medium bg-orange/10 text-orange border border-orange/20">
+                      {ak}
+                      <button
+                        type="button"
+                        onClick={() => setForm({ ...form, alert_keywords: form.alert_keywords.filter((x) => x !== ak) })}
+                        className="w-4 h-4 rounded-full flex items-center justify-center hover:bg-orange/20"
+                      >
+                        <X className="w-2.5 h-2.5" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              {form.alert_keywords.length < 15 && (
+                <div className="flex gap-2">
+                  <Input
+                    value={newAlertKw}
+                    onChange={(e) => setNewAlertKw(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        const val = newAlertKw.trim();
+                        if (val && !form.alert_keywords.includes(val)) {
+                          setForm({ ...form, alert_keywords: [...form.alert_keywords, val] });
+                          setNewAlertKw('');
+                        }
+                      }
+                    }}
+                    placeholder='Es. "crisi", "scandalo", "CEO"...'
+                    className="flex-1 text-sm"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={() => {
+                      const val = newAlertKw.trim();
+                      if (val && !form.alert_keywords.includes(val)) {
+                        setForm({ ...form, alert_keywords: [...form.alert_keywords, val] });
+                        setNewAlertKw('');
+                      }
+                    }}
+                    disabled={!newAlertKw.trim()}
+                    className="h-9 w-9"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </Button>
+                </div>
+              )}
+            </div>
+
             <Button type="submit" variant="accent" disabled={saving} className="gap-2">
               {saving ? (
                 <>
@@ -341,6 +431,18 @@ export default function EditProjectPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Toast notification */}
+      {toast && (
+        <div className={`fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg animate-fade-in-up text-sm font-medium ${
+          toast.type === 'success'
+            ? 'bg-positive text-white'
+            : 'bg-destructive text-white'
+        }`}>
+          {toast.type === 'success' ? <CheckCircle2 className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
+          {toast.message}
+        </div>
+      )}
     </div>
   );
 }

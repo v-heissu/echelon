@@ -21,6 +21,18 @@ export async function GET(
 
   if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 });
 
+  // Verify access: admin sees all, clients only assigned projects
+  const { data: profile } = await admin.from('users').select('role').eq('id', user.id).maybeSingle();
+  if (profile?.role !== 'admin') {
+    const { data: membership } = await admin
+      .from('project_users')
+      .select('user_id')
+      .eq('project_id', project.id)
+      .eq('user_id', user.id)
+      .maybeSingle();
+    if (!membership) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
   // Auto-complete any running scans that have all tasks done (fixes stuck scans)
   const { data: runningScans } = await admin
     .from('scans')

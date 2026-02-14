@@ -55,12 +55,19 @@ export async function POST(
 
   if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 });
 
-  // Delete existing tags for this project
-  await admin.from('tags').delete().eq('project_id', project.id);
-
-  // Rebuild from analysis data
+  // Rebuild from analysis data (deletes existing tags internally)
   const rebuilt = await rebuildTagsFromAnalysis(admin, project.id);
   return NextResponse.json({ tags: rebuilt, rebuilt: true });
+}
+
+function normalizeTagSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/[^\w-]/g, '')
+    .replace(/-{2,}/g, '-')
+    .replace(/^-|-$/g, '');
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -122,16 +129,17 @@ async function rebuildTagsFromAnalysis(admin: any, projectId: string) {
 
   if (themeMap.size === 0) return [];
 
-  // Delete existing tags first to avoid duplicates (no unique constraint on project_id,slug)
+  // Delete existing tags and rebuild (single delete - not redundant)
   await admin.from('tags').delete().eq('project_id', projectId);
 
-  const tagsToInsert = Array.from(themeMap.entries()).map(([name, count]) => ({
-    project_id: projectId,
-    name,
-    slug: name.replace(/\s+/g, '-').replace(/[^\w-]/g, ''),
-    count,
-    last_seen_at: new Date().toISOString(),
-  }));
+  const tagsToInsert = Array.from(themeMap.entries())
+    .map(([name, count]) => {
+      const slug = normalizeTagSlug(name);
+      return slug ? { project_id: projectId, name, slug, count, last_seen_at: new Date().toISOString() } : null;
+    })
+    .filter(Boolean);
+
+  if (tagsToInsert.length === 0) return [];
 
   const { data: inserted, error: insertError } = await admin
     .from('tags')

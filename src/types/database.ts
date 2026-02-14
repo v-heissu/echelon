@@ -26,6 +26,7 @@ export interface Project {
   schedule_day: number;
   language: string;
   location_code: number;
+  alert_keywords: string[];
   is_active: boolean;
   created_at: string;
 }
@@ -81,6 +82,8 @@ export interface AiAnalysis {
   entities: EntityEntry[];
   summary: string;
   language_detected: string;
+  is_hi_priority: boolean;
+  priority_reason: string | null;
   analyzed_at: string;
 }
 

@@ -9,8 +9,8 @@ export async function POST(request: Request) {
 
   const admin = createAdminClient();
 
-  const { data: profile } = await admin.from('users').select('role').eq('id', user.id).single();
-  if (profile?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  const { data: profile } = await admin.from('users').select('role').eq('id', user.id).maybeSingle();
+  if (!profile || profile.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const { project_slug } = await request.json();
 

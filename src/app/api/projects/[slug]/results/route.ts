@@ -32,6 +32,18 @@ export async function GET(
 
   if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 });
 
+  // Verify access: admin sees all, clients only assigned projects
+  const { data: profile } = await admin.from('users').select('role').eq('id', user.id).maybeSingle();
+  if (profile?.role !== 'admin') {
+    const { data: membership } = await admin
+      .from('project_users')
+      .select('user_id')
+      .eq('project_id', project.id)
+      .eq('user_id', user.id)
+      .maybeSingle();
+    if (!membership) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
   // Build query
   let query = admin
     .from('serp_results')
@@ -63,26 +75,32 @@ export async function GET(
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // Post-filter by sentiment and tag if needed
+  // Post-filter by sentiment and tag if needed (ai_analysis may be array or object from Supabase)
   let filtered = results || [];
 
   if (sentiment) {
     filtered = filtered.filter((r) => {
-      const analysis = r.ai_analysis as unknown as { sentiment: string }[];
-      return analysis?.[0]?.sentiment === sentiment;
+      const raw = r.ai_analysis;
+      const a = Array.isArray(raw) ? raw[0] : raw;
+      return a?.sentiment === sentiment;
     });
   }
 
   if (tag) {
     filtered = filtered.filter((r) => {
-      const analysis = r.ai_analysis as unknown as { themes: { name: string }[] }[];
-      return analysis?.[0]?.themes?.some((t) => t.name?.toLowerCase() === tag.toLowerCase());
+      const raw = r.ai_analysis;
+      const a = Array.isArray(raw) ? raw[0] : raw;
+      const themes = Array.isArray(a?.themes) ? a.themes : [];
+      return themes.some((t: { name?: string }) => t.name?.toLowerCase() === tag.toLowerCase());
     });
   }
 
+  // Adjust total count when post-filtering (since DB count doesn't reflect post-filters)
+  const adjustedTotal = (sentiment || tag) ? filtered.length : (count || 0);
+
   return NextResponse.json({
     results: filtered,
-    total: count || 0,
+    total: adjustedTotal,
     page,
     limit,
   });

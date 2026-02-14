@@ -7,7 +7,7 @@ import { SentimentChart } from '@/components/dashboard/sentiment-chart';
 import { DomainBarChart } from '@/components/dashboard/domain-bar-chart';
 import { ThemeBubbleChart } from '@/components/dashboard/theme-bubble-chart';
 import { PublicationTimeline } from '@/components/dashboard/publication-timeline';
-import { BarChart3, Loader2, AlertTriangle, ChevronDown, ChevronUp, CheckCircle2, XCircle, Clock } from 'lucide-react';
+import { BarChart3, Loader2, AlertTriangle, ChevronDown, ChevronUp, CheckCircle2, XCircle, Clock, Timer, Zap } from 'lucide-react';
 
 interface DashboardData {
   kpi: { total_results: number; unique_domains: number; competitor_mentions: number; avg_sentiment: number };
@@ -36,6 +36,27 @@ interface ScanJob {
   started_at: string | null;
   completed_at: string | null;
   error_message: string | null;
+  retry_count: number;
+  duration_ms: number | null;
+}
+
+function formatJobDuration(ms: number | null): string {
+  if (ms === null || ms === undefined) return '';
+  if (ms < 1000) return `${ms}ms`;
+  if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
+  const min = Math.floor(ms / 60000);
+  const sec = Math.round((ms % 60000) / 1000);
+  return `${min}m ${sec}s`;
+}
+
+function formatElapsed(startedAt: string | null): string {
+  if (!startedAt) return '';
+  const ms = Date.now() - new Date(startedAt).getTime();
+  if (ms < 1000) return `${ms}ms`;
+  if (ms < 60000) return `${(ms / 1000).toFixed(0)}s`;
+  const min = Math.floor(ms / 60000);
+  const sec = Math.round((ms % 60000) / 1000);
+  return `${min}m ${sec}s`;
 }
 
 const PARALLEL_WORKERS = 3;
@@ -147,7 +168,9 @@ export default function ProjectDashboard() {
           totalProcessed++;
           consecutiveErrors = 0;
           if (mountedRef.current) {
-            setProcessingStatus(`${totalProcessed} task completati`);
+            const keyword = result.keyword || '';
+            const source = result.source === 'google_organic' ? 'Web' : 'News';
+            setProcessingStatus(`${totalProcessed} task completati — ultimo: ${keyword} (${source})`);
             setProcessingError(null);
             setProcessedKeywords(prev => [
               ...prev,
@@ -321,7 +344,29 @@ export default function ProjectDashboard() {
           {/* Job details accordion */}
           {showJobDetails && (
             <div className="border-t border-[#f0f2f5] animate-slide-down">
-              <div className="p-4 max-h-64 overflow-y-auto space-y-1">
+              <div className="p-4 max-h-80 overflow-y-auto space-y-1">
+                {/* Status summary */}
+                {jobDetails.length > 0 && (
+                  <div className="flex items-center gap-4 mb-3 pb-2 border-b border-[#f0f2f5] text-xs">
+                    <span className="flex items-center gap-1 text-positive">
+                      <CheckCircle2 className="h-3 w-3" />
+                      {jobDetails.filter(j => j.status === 'completed').length} completati
+                    </span>
+                    <span className="flex items-center gap-1 text-accent">
+                      <Loader2 className="h-3 w-3" />
+                      {jobDetails.filter(j => j.status === 'processing').length} in corso
+                    </span>
+                    <span className="flex items-center gap-1 text-destructive">
+                      <XCircle className="h-3 w-3" />
+                      {jobDetails.filter(j => j.status === 'failed').length} falliti
+                    </span>
+                    <span className="flex items-center gap-1 text-muted-foreground">
+                      <Clock className="h-3 w-3" />
+                      {jobDetails.filter(j => j.status === 'pending').length} in coda
+                    </span>
+                  </div>
+                )}
+
                 {jobDetails.length > 0 ? (
                   jobDetails.map((job) => (
                     <div key={job.id} className="flex items-center gap-2 py-1.5 px-2 rounded-lg hover:bg-[#f8f9fa] text-xs">
@@ -329,13 +374,38 @@ export default function ProjectDashboard() {
                       {job.status === 'failed' && <XCircle className="h-3.5 w-3.5 text-destructive shrink-0" />}
                       {job.status === 'processing' && <Loader2 className="h-3.5 w-3.5 text-accent animate-spin shrink-0" />}
                       {job.status === 'pending' && <Clock className="h-3.5 w-3.5 text-muted-foreground shrink-0" />}
-                      <span className="font-medium text-primary truncate">{job.keyword}</span>
-                      <span className="text-muted-foreground shrink-0">
+                      <span className="font-medium text-primary truncate min-w-[100px]">{job.keyword}</span>
+                      <span className="text-muted-foreground shrink-0 text-[10px] bg-[#f0f2f5] px-1.5 py-0.5 rounded">
                         {job.source === 'google_organic' ? 'Web' : 'News'}
                       </span>
+
+                      {/* Duration for completed jobs */}
+                      {job.duration_ms != null && (
+                        <span className="text-muted-foreground flex items-center gap-0.5 shrink-0">
+                          <Timer className="h-3 w-3" />
+                          {formatJobDuration(job.duration_ms)}
+                        </span>
+                      )}
+
+                      {/* Live elapsed for processing jobs */}
+                      {job.status === 'processing' && job.started_at && (
+                        <span className="text-accent flex items-center gap-0.5 shrink-0">
+                          <Zap className="h-3 w-3" />
+                          {formatElapsed(job.started_at)}
+                        </span>
+                      )}
+
+                      {/* Retry indicator */}
+                      {job.retry_count > 0 && (
+                        <span className="flex items-center gap-0.5 text-orange-500 shrink-0">
+                          <AlertTriangle className="h-3 w-3" />
+                          {job.retry_count}/3
+                        </span>
+                      )}
+
                       {job.error_message && (
-                        <span className="text-destructive truncate ml-auto" title={job.error_message}>
-                          {job.error_message.slice(0, 40)}
+                        <span className="text-destructive truncate ml-auto max-w-[200px]" title={job.error_message}>
+                          {job.error_message}
                         </span>
                       )}
                     </div>
@@ -348,11 +418,16 @@ export default function ProjectDashboard() {
                         : <XCircle className="h-3.5 w-3.5 text-destructive shrink-0" />
                       }
                       <span className="font-medium text-primary">{pk.keyword}</span>
-                      <span className="text-muted-foreground">{pk.source === 'google_organic' ? 'Web' : 'News'}</span>
+                      <span className="text-muted-foreground text-[10px] bg-[#f0f2f5] px-1.5 py-0.5 rounded">
+                        {pk.source === 'google_organic' ? 'Web' : 'News'}
+                      </span>
                     </div>
                   ))
                 ) : (
-                  <p className="text-xs text-muted-foreground py-2">In attesa dei primi risultati...</p>
+                  <div className="flex items-center gap-2 py-3 text-xs text-muted-foreground">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    In attesa dei primi risultati...
+                  </div>
                 )}
               </div>
             </div>
