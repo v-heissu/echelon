@@ -12,8 +12,8 @@ export async function PUT(
 
   const admin = createAdminClient();
 
-  const { data: profile } = await admin.from('users').select('role').eq('id', user.id).single();
-  if (profile?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  const { data: profile } = await admin.from('users').select('role').eq('id', user.id).maybeSingle();
+  if (!profile || profile.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const body = await request.json();
 
@@ -39,13 +39,15 @@ export async function DELETE(
 
   const admin = createAdminClient();
 
-  const { data: profile } = await admin.from('users').select('role').eq('id', user.id).single();
-  if (profile?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  const { data: profile } = await admin.from('users').select('role').eq('id', user.id).maybeSingle();
+  if (!profile || profile.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
-  // Delete profile first
-  await admin.from('users').delete().eq('id', params.id);
+  // Prevent self-deletion
+  if (params.id === user.id) {
+    return NextResponse.json({ error: 'Non puoi eliminare il tuo stesso account' }, { status: 400 });
+  }
 
-  // Delete auth user
+  // Delete auth user first - this cascades to public.users via ON DELETE CASCADE
   const { error } = await admin.auth.admin.deleteUser(params.id);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

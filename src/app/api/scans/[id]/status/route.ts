@@ -24,19 +24,32 @@ export async function GET(
     ? Math.round((scan.completed_tasks / scan.total_tasks) * 100)
     : 0;
 
-  // Get job details for accordion
+  // Get job details for accordion - include retry_count and timing for full context
   const { data: jobs } = await admin
     .from('job_queue')
-    .select('id, keyword, source, status, started_at, completed_at, error_message')
+    .select('id, keyword, source, status, started_at, completed_at, error_message, retry_count, created_at')
     .eq('scan_id', params.id)
     .order('created_at', { ascending: true });
 
-  const failedCount = jobs?.filter(j => j.status === 'failed').length || 0;
+  const jobsWithDuration = (jobs || []).map((j) => ({
+    ...j,
+    duration_ms: j.started_at && j.completed_at
+      ? new Date(j.completed_at).getTime() - new Date(j.started_at).getTime()
+      : null,
+  }));
+
+  const failedCount = jobsWithDuration.filter(j => j.status === 'failed').length;
+  const pendingCount = jobsWithDuration.filter(j => j.status === 'pending').length;
+  const processingCount = jobsWithDuration.filter(j => j.status === 'processing').length;
+  const completedCount = jobsWithDuration.filter(j => j.status === 'completed').length;
 
   return NextResponse.json({
     ...scan,
     progress,
     failed_tasks: failedCount,
-    jobs: jobs || [],
+    pending_tasks: pendingCount,
+    processing_tasks: processingCount,
+    completed_count: completedCount,
+    jobs: jobsWithDuration,
   });
 }

@@ -50,21 +50,35 @@ export async function POST(request: Request) {
     email: adminEmail,
     password: adminPassword,
     email_confirm: true,
+    user_metadata: { display_name: 'Admin' },
   });
 
   if (authError) {
     return NextResponse.json({ error: authError.message }, { status: 500 });
   }
 
-  // The on_auth_user_created trigger auto-creates the profile as 'client'.
-  // Promote to admin and set display name.
-  const { error: profileError } = await supabase
-    .from('users')
-    .update({ role: 'admin', display_name: 'Admin' })
-    .eq('id', authUser.user.id);
+  // The trigger may or may not have fired yet. Use upsert with retries to ensure
+  // the profile exists and is promoted to admin.
+  let profileOk = false;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const { error: upsertError } = await supabase
+      .from('users')
+      .upsert({
+        id: authUser.user.id,
+        email: adminEmail,
+        display_name: 'Admin',
+        role: 'admin',
+      }, { onConflict: 'id' });
 
-  if (profileError) {
-    return NextResponse.json({ error: profileError.message }, { status: 500 });
+    if (!upsertError) {
+      profileOk = true;
+      break;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 200 * (attempt + 1)));
+  }
+
+  if (!profileOk) {
+    return NextResponse.json({ error: 'Profilo admin non creato dopo i tentativi' }, { status: 500 });
   }
 
   return NextResponse.json({ message: 'Admin user created', id: authUser.user.id });

@@ -12,8 +12,8 @@ export async function POST(
 
   const admin = createAdminClient();
 
-  const { data: profile } = await admin.from('users').select('role').eq('id', user.id).single();
-  if (profile?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  const { data: profile } = await admin.from('users').select('role').eq('id', user.id).maybeSingle();
+  if (!profile || profile.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const { user_id, role } = await request.json();
 
@@ -46,8 +46,8 @@ export async function DELETE(
 
   const admin = createAdminClient();
 
-  const { data: profile } = await admin.from('users').select('role').eq('id', user.id).single();
-  if (profile?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  const { data: profile } = await admin.from('users').select('role').eq('id', user.id).maybeSingle();
+  if (!profile || profile.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const { user_id } = await request.json();
 

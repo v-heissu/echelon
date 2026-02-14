@@ -72,11 +72,12 @@ export async function processOneJob(): Promise<ProcessResult> {
 
     const { data: proj } = await supabase
       .from('projects')
-      .select('industry, competitors, language, location_code')
+      .select('industry, competitors, language, location_code, alert_keywords')
       .eq('id', scan.project_id)
       .single();
 
     const industry = (proj?.industry as string) || '';
+    const alertKeywords = Array.isArray(proj?.alert_keywords) ? (proj.alert_keywords as string[]) : [];
     const competitors = (proj?.competitors as string[]) || [];
     const language = (proj?.language as string) || 'it';
     const locationCode = (proj?.location_code as number) || 2380;
@@ -143,7 +144,7 @@ export async function processOneJob(): Promise<ProcessResult> {
       }));
 
       try {
-        const analysis = await gemini.analyzeSerpResults(job.keyword, industry, analysisInput);
+        const analysis = await gemini.analyzeSerpResults(job.keyword, industry, analysisInput, alertKeywords);
 
         // Auto-discover competitors: mark results identified by AI as competitors
         const discoveredCompetitors = analysis.discovered_competitors || [];
@@ -173,10 +174,15 @@ export async function processOneJob(): Promise<ProcessResult> {
             entities: aiResult?.entities || [],
             summary: aiResult?.summary || '',
             language_detected: language,
+            is_hi_priority: aiResult?.is_hi_priority || false,
+            priority_reason: aiResult?.priority_reason || null,
           };
         });
 
-        await supabase.from('ai_analysis').insert(analysisData);
+        const { error: analysisInsertError } = await supabase.from('ai_analysis').insert(analysisData);
+        if (analysisInsertError) {
+          console.error('[processOneJob] ai_analysis insert failed:', analysisInsertError.message);
+        }
 
         if (scan.project_id) {
           await updateTags(supabase, scan.project_id, analysis.results);
@@ -254,6 +260,16 @@ export async function processOneJob(): Promise<ProcessResult> {
   }
 }
 
+function normalizeTagSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/[^\w-]/g, '')
+    .replace(/-{2,}/g, '-')    // collapse multiple hyphens
+    .replace(/^-|-$/g, '');    // trim leading/trailing hyphens
+}
+
 async function updateTags(
   supabase: ReturnType<typeof createAdminClient>,
   projectId: string,
@@ -269,7 +285,7 @@ async function updateTags(
       if (!name) continue;
       const existing = themeMap.get(name) || { count: 0, sentimentSum: 0, sentimentCount: 0 };
       existing.count++;
-      if (result.sentiment_score !== undefined) {
+      if (result.sentiment_score !== undefined && !isNaN(result.sentiment_score)) {
         existing.sentimentSum += result.sentiment_score;
         existing.sentimentCount++;
       }
@@ -286,9 +302,11 @@ async function updateTags(
 
   const entries = Array.from(themeMap.entries());
   for (const [name, data] of entries) {
-    const slug = name.replace(/\s+/g, '-').replace(/[^\w-]/g, '');
+    const slug = normalizeTagSlug(name);
+    if (!slug) continue;
 
-    // Use maybeSingle() to avoid error when no row matches
+    // Try upsert first (requires unique constraint from migration 004)
+    // Fallback to lookup+update/insert if upsert fails
     const { data: existing, error: lookupError } = await supabase
       .from('tags')
       .select('id, count')
@@ -321,7 +339,23 @@ async function updateTags(
         last_seen_at: new Date().toISOString(),
       });
       if (insertError) {
-        console.error('[updateTags] Insert error for', name, ':', insertError.message);
+        // Handle duplicate key race condition: another worker inserted the same tag
+        if (insertError.code === '23505') {
+          // Unique constraint violation - try to update instead
+          const { error: retryUpdateError } = await supabase
+            .from('tags')
+            .update({
+              count: data.count,
+              last_seen_at: new Date().toISOString(),
+            })
+            .eq('project_id', projectId)
+            .eq('slug', slug);
+          if (retryUpdateError) {
+            console.error('[updateTags] Retry update error for', name, ':', retryUpdateError.message);
+          }
+        } else {
+          console.error('[updateTags] Insert error for', name, ':', insertError.message);
+        }
       }
     }
   }

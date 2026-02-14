@@ -31,6 +31,8 @@ interface AnalysisResult {
   entities: { name: string; type: string }[];
   summary: string;
   is_competitor: boolean;
+  is_hi_priority: boolean;
+  priority_reason: string | null;
 }
 
 interface GeminiResponse {
@@ -49,7 +51,8 @@ export class GeminiClient {
   async analyzeSerpResults(
     keyword: string,
     industry: string,
-    results: AnalysisInput[]
+    results: AnalysisInput[],
+    alertKeywords: string[] = []
   ): Promise<GeminiResponse> {
     const model = this.genAI.getGenerativeModel({
       model: this.modelName,
@@ -58,6 +61,12 @@ export class GeminiClient {
         responseMimeType: 'application/json',
       },
     });
+
+    const alertBlock = alertKeywords.length > 0
+      ? `\n7. is_hi_priority: true se il contenuto menziona o è semanticamente correlato a uno di questi "alert keywords": ${JSON.stringify(alertKeywords)}. Valuta anche sinonimi, riferimenti indiretti, e contesti correlati.
+8. priority_reason: se is_hi_priority è true, spiega brevemente (max 1 frase) quale alert keyword è stata riconosciuta e perché. Se false, null.\n`
+      : `\n7. is_hi_priority: false (nessun alert keyword configurato)
+8. priority_reason: null\n`;
 
     const prompt = `Sei un analista di intelligence competitiva. Analizza i seguenti risultati SERP e il contenuto estratto dalle pagine.
 
@@ -68,7 +77,7 @@ Per OGNI risultato, fornisci:
 4. entities: array di entità rilevanti con tipo (brand, person, product, technology, location)
 5. summary: riassunto in 1-2 frasi del contenuto
 6. is_competitor: true se il dominio sembra appartenere a un competitor nel settore "${industry}", false altrimenti
-
+${alertBlock}
 Inoltre, nel campo "discovered_competitors" a livello root, elenca i domini (solo hostname senza www) che identifichi come competitor nel settore.
 
 Rispondi SOLO con JSON valido, nessun testo prima o dopo.
@@ -81,7 +90,9 @@ Output format:
     "sentiment_score": 0.0,
     "entities": [{"name": "Entità", "type": "brand"}],
     "summary": "Riassunto del contenuto...",
-    "is_competitor": false
+    "is_competitor": false,
+    "is_hi_priority": false,
+    "priority_reason": null
   }],
   "discovered_competitors": ["domain1.com", "domain2.com"]
 }

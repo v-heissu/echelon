@@ -19,6 +19,7 @@ import {
   Search,
   Building2,
   Check,
+  AlertTriangle,
 } from 'lucide-react';
 
 type Step = 'basics' | 'ai-fill' | 'review';
@@ -51,12 +52,15 @@ export default function NewProjectPage() {
   const [scheduleDay, setScheduleDay] = useState(1);
   const [language, setLanguage] = useState('it');
   const [locationCode, setLocationCode] = useState(2380);
+  const [alertKeywords, setAlertKeywords] = useState<string[]>([]);
 
   // Input refs for adding items
   const keywordInputRef = useRef<HTMLInputElement>(null);
   const competitorInputRef = useRef<HTMLInputElement>(null);
+  const alertInputRef = useRef<HTMLInputElement>(null);
   const [newKeyword, setNewKeyword] = useState('');
   const [newCompetitor, setNewCompetitor] = useState('');
+  const [newAlertKeyword, setNewAlertKeyword] = useState('');
 
   const addKeyword = useCallback(() => {
     const val = newKeyword.trim();
@@ -77,6 +81,15 @@ export default function NewProjectPage() {
     setNewCompetitor('');
     competitorInputRef.current?.focus();
   }, [newCompetitor, competitors]);
+
+  const addAlertKeyword = useCallback(() => {
+    const val = newAlertKeyword.trim();
+    if (val && !alertKeywords.includes(val) && alertKeywords.length < 15) {
+      setAlertKeywords((prev) => [...prev, val]);
+      setNewAlertKeyword('');
+      alertInputRef.current?.focus();
+    }
+  }, [newAlertKeyword, alertKeywords]);
 
   async function handleAiFill() {
     if (!name.trim()) return;
@@ -107,8 +120,10 @@ export default function NewProjectPage() {
       setAiDone(true);
       // Transition to review after a brief moment
       setTimeout(() => setStep('review'), 600);
-    } catch {
-      alert('Errore nella generazione AI. Riprova.');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Errore sconosciuto';
+      alert(`Errore nella generazione AI: ${message}. Verifica la connessione e riprova.`);
+      setStep('basics');
     } finally {
       setAiLoading(false);
     }
@@ -130,6 +145,7 @@ export default function NewProjectPage() {
           schedule_day: scheduleDay,
           language,
           location_code: locationCode,
+          alert_keywords: alertKeywords,
         }),
       });
 
@@ -572,6 +588,63 @@ export default function NewProjectPage() {
                   </div>
                 )}
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Alert Keywords (Semantic Particles) */}
+          <Card className="border-0 shadow-md border-l-4 border-l-orange">
+            <CardContent className="p-5">
+              <div className="flex items-center gap-2 mb-1">
+                <div className="w-8 h-8 rounded-lg bg-orange/10 flex items-center justify-center">
+                  <AlertTriangle className="w-4 h-4 text-orange" />
+                </div>
+                <h3 className="font-semibold text-primary">Alert Semantici</h3>
+                <span className="text-xs text-muted-foreground">({alertKeywords.length}/15)</span>
+              </div>
+              <p className="text-xs text-muted-foreground mb-3">
+                Particelle semantiche che, se riconosciute dall&apos;analisi AI nei risultati, contrassegneranno automaticamente il risultato come &quot;alta priorita&quot;. Usa termini come &quot;crisi&quot;, &quot;scandalo&quot;, &quot;multa&quot;, &quot;data breach&quot;, nomi di persone chiave, etc.
+              </p>
+
+              {alertKeywords.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-3 stagger-children">
+                  {alertKeywords.map((ak) => (
+                    <Chip
+                      key={ak}
+                      variant="orange"
+                      onRemove={() => setAlertKeywords((prev) => prev.filter((x) => x !== ak))}
+                    >
+                      {ak}
+                    </Chip>
+                  ))}
+                </div>
+              )}
+
+              {alertKeywords.length < 15 && (
+                <div className="flex gap-2">
+                  <Input
+                    ref={alertInputRef}
+                    value={newAlertKeyword}
+                    onChange={(e) => setNewAlertKeyword(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        addAlertKeyword();
+                      }
+                    }}
+                    placeholder='Es. "crisi reputazionale", "indagine", "CEO dimissioni"...'
+                    className="flex-1"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={addAlertKeyword}
+                    disabled={!newAlertKeyword.trim()}
+                  >
+                    <Plus className="w-4 h-4" />
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
 

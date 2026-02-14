@@ -33,25 +33,28 @@ export async function PUT(
 
   const admin = createAdminClient();
 
-  const { data: profile } = await admin.from('users').select('role').eq('id', user.id).single();
-  if (profile?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  const { data: profile } = await admin.from('users').select('role').eq('id', user.id).maybeSingle();
+  if (!profile || profile.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const body = await request.json();
 
+  // Build update object, only including fields that were sent
+  const updateData: Record<string, unknown> = {};
+  if (body.name !== undefined) updateData.name = body.name;
+  if (body.industry !== undefined) updateData.industry = body.industry;
+  if (body.keywords !== undefined) updateData.keywords = body.keywords;
+  if (body.competitors !== undefined) updateData.competitors = body.competitors;
+  if (body.sources !== undefined) updateData.sources = body.sources;
+  if (body.schedule !== undefined) updateData.schedule = body.schedule;
+  if (body.schedule_day !== undefined) updateData.schedule_day = body.schedule_day;
+  if (body.language !== undefined) updateData.language = body.language;
+  if (body.location_code !== undefined) updateData.location_code = body.location_code;
+  if (body.is_active !== undefined) updateData.is_active = body.is_active;
+  if (body.alert_keywords !== undefined) updateData.alert_keywords = Array.isArray(body.alert_keywords) ? body.alert_keywords.slice(0, 15) : [];
+
   const { data: project, error } = await admin
     .from('projects')
-    .update({
-      name: body.name,
-      industry: body.industry,
-      keywords: body.keywords,
-      competitors: body.competitors,
-      sources: body.sources,
-      schedule: body.schedule,
-      schedule_day: body.schedule_day,
-      language: body.language,
-      location_code: body.location_code,
-      is_active: body.is_active,
-    })
+    .update(updateData)
     .eq('slug', params.slug)
     .select()
     .single();
@@ -71,8 +74,8 @@ export async function DELETE(
 
   const admin = createAdminClient();
 
-  const { data: profile } = await admin.from('users').select('role').eq('id', user.id).single();
-  if (profile?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  const { data: profile } = await admin.from('users').select('role').eq('id', user.id).maybeSingle();
+  if (!profile || profile.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const { error } = await admin.from('projects').delete().eq('slug', params.slug);
 
