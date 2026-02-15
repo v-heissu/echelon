@@ -48,7 +48,8 @@ export async function GET(
     const { data } = await admin
       .from('serp_results')
       .select('keyword, domain, url, ai_analysis(entities, sentiment, sentiment_score)')
-      .eq('scan_id', scanId);
+      .eq('scan_id', scanId)
+      .limit(10000);
     results = data;
   } else {
     const { data: scans } = await admin
@@ -69,7 +70,8 @@ export async function GET(
     const { data } = await admin
       .from('serp_results')
       .select('keyword, domain, url, ai_analysis(entities, sentiment, sentiment_score)')
-      .in('scan_id', scanIds);
+      .in('scan_id', scanIds)
+      .limit(10000);
     results = data;
   }
 
@@ -101,6 +103,7 @@ interface SerpRow {
 
 function aggregateEntities(results: SerpRow[], filterType: string) {
   const entityMap = new Map<string, {
+    displayName: string;
     count: number;
     domains: Set<string>;
     keywords: Set<string>;
@@ -115,10 +118,12 @@ function aggregateEntities(results: SerpRow[], filterType: string) {
 
     for (const entity of a.entities) {
       if (!entity.name || entity.type !== filterType) continue;
-      const key = entity.name.trim();
+      const originalName = entity.name.trim();
+      const key = originalName.toLowerCase();
       if (!key) continue;
 
       const existing = entityMap.get(key) || {
+        displayName: originalName,
         count: 0,
         domains: new Set<string>(),
         keywords: new Set<string>(),
@@ -137,8 +142,8 @@ function aggregateEntities(results: SerpRow[], filterType: string) {
   }
 
   return Array.from(entityMap.entries())
-    .map(([name, data]) => ({
-      name,
+    .map(([, data]) => ({
+      name: data.displayName,
       type: filterType,
       count: data.count,
       domains: Array.from(data.domains).slice(0, 10),

@@ -40,15 +40,17 @@ export async function POST(
   }
 
   let scanId: string | null = null;
+  let cursor: string | null = null;
   try {
     const body = await request.json();
     scanId = body.scan_id || null;
+    cursor = body.cursor || null;
   } catch {
     // No body or invalid JSON — that's fine
   }
 
   try {
-    const result = await runContextFilterBatch(project.id, scanId);
+    const result = await runContextFilterBatch(project.id, scanId, cursor);
     return NextResponse.json(result);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';

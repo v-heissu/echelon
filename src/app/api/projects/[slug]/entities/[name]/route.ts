@@ -35,6 +35,7 @@ export async function GET(
   const { searchParams } = new URL(request.url);
   const type = searchParams.get('type') || 'brand';
   const entityName = decodeURIComponent(params.name);
+  const entityNameLower = entityName.toLowerCase();
 
   // Get all scan IDs for this project
   const { data: scans } = await admin
@@ -66,7 +67,8 @@ export async function GET(
   const { data: allResults } = await admin
     .from('serp_results')
     .select('id, title, url, domain, keyword, source, position, is_competitor, scan_id, fetched_at, ai_analysis(entities, sentiment, sentiment_score, summary, themes)')
-    .in('scan_id', scanIds);
+    .in('scan_id', scanIds)
+    .limit(10000);
 
   if (!allResults || allResults.length === 0) {
     return NextResponse.json({
@@ -116,15 +118,15 @@ export async function GET(
     let matches = false;
 
     if (type === 'competitor') {
-      // For competitor type, match by domain
-      if (r.domain === entityName) {
+      // For competitor type, match by domain (case-insensitive)
+      if (r.domain?.toLowerCase() === entityNameLower) {
         matches = true;
       }
     } else {
-      // For brand/person, match by entity name in the entities array
+      // For brand/person, match by entity name in the entities array (case-insensitive)
       if (a.entities && Array.isArray(a.entities)) {
         for (const entity of a.entities) {
-          if (entity.name?.trim() === entityName && entity.type === type) {
+          if (entity.name?.trim().toLowerCase() === entityNameLower && entity.type === type) {
             matches = true;
             break;
           }

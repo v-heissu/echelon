@@ -14,6 +14,7 @@ export interface ContextFilterResult {
 export interface BatchFilterResult extends ContextFilterResult {
   remaining: number;
   status: 'processing' | 'done';
+  cursor: string | null;
 }
 
 const BATCH_SIZE = 50;
@@ -25,7 +26,8 @@ const BATCH_SIZE = 50;
  */
 export async function runContextFilterBatch(
   projectId: string,
-  scanId?: string | null
+  scanId?: string | null,
+  cursor?: string | null
 ): Promise<BatchFilterResult> {
   const supabase = createAdminClient();
 
@@ -49,20 +51,21 @@ export async function runContextFilterBatch(
     errors: [],
     remaining: 0,
     status: 'done',
+    cursor: cursor || null,
   };
 
-  // 2. Fetch one batch of unevaluated results
-  // We track which results have been evaluated by checking a marker.
-  // Since we no longer have is_off_topic, we use a different approach:
-  // We process ALL results and delete off-topic ones.
-  // To avoid re-evaluating, we store a temporary marker via RPC or simply
-  // process results that haven't been evaluated in this run.
-  // Simplest approach: just fetch results ordered by id, process them.
+  // 2. Fetch one batch of results, using cursor-based pagination to avoid
+  // re-processing the same on-topic results in an infinite loop.
   let query = supabase
     .from('ai_analysis')
     .select('id, summary, themes, serp_results!inner(id, title, url, snippet, scan_id, scans!inner(project_id))')
     .eq('serp_results.scans.project_id', projectId)
+    .order('id', { ascending: true })
     .limit(BATCH_SIZE);
+
+  if (cursor) {
+    query = query.gt('id', cursor);
+  }
 
   if (scanId) {
     query = query.eq('serp_results.scan_id', scanId);
@@ -148,11 +151,21 @@ export async function runContextFilterBatch(
     result.errors.push(msg);
   }
 
-  // 4. Check how many remain (project-scoped)
+  // 4. Update cursor to the last processed ID
+  if (analyses.length > 0) {
+    // Find the max ID from the batch (already sorted ascending)
+    result.cursor = analyses[analyses.length - 1].id;
+  }
+
+  // 5. Check how many remain AFTER the current cursor
   let remainQuery = supabase
     .from('ai_analysis')
     .select('id, serp_results!inner(scan_id, scans!inner(project_id))', { count: 'exact', head: true })
     .eq('serp_results.scans.project_id', projectId);
+
+  if (result.cursor) {
+    remainQuery = remainQuery.gt('id', result.cursor);
+  }
 
   if (scanId) {
     remainQuery = remainQuery.eq('serp_results.scan_id', scanId);
@@ -187,13 +200,15 @@ export async function runContextFilter(
   };
 
   let hasMore = true;
+  let cursor: string | null = null;
   while (hasMore) {
-    const batch = await runContextFilterBatch(projectId, scanId);
+    const batch = await runContextFilterBatch(projectId, scanId, cursor);
     totals.project_slug = batch.project_slug;
     totals.total_evaluated += batch.total_evaluated;
     totals.marked_off_topic += batch.marked_off_topic;
     totals.deleted += batch.deleted;
     totals.errors.push(...batch.errors);
+    cursor = batch.cursor;
 
     hasMore = batch.status === 'processing';
 
