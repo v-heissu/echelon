@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { processOneJob } from '@/lib/worker/process-jobs';
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 export async function GET(request: Request) {
   // Verify cron secret
@@ -77,9 +77,9 @@ export async function GET(request: Request) {
     triggeredProjects.push(project.slug);
   }
 
-  // Process as many jobs as possible within the 55s budget
+  // Process as many jobs as possible within the 280s budget (Fluid Compute 300s)
   const startTime = Date.now();
-  const MAX_RUNTIME = 55000;
+  const MAX_RUNTIME = 280_000;
   let processedCount = 0;
 
   while (Date.now() - startTime < MAX_RUNTIME) {

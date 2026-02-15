@@ -105,8 +105,8 @@ export async function GET(
   const aiBriefing: string | null = latestScanWithBriefing?.ai_briefing || null;
 
   const emptyResponse = {
-    kpi: { total_results: 0, unique_domains: 0, competitor_mentions: 0, avg_sentiment: 0 },
-    delta: { total_results: 0, unique_domains: 0, competitor_mentions: 0, avg_sentiment: 0 },
+    kpi: { total_results: 0, unique_domains: 0, competitor_mentions: 0, avg_sentiment: 0, alert_count: 0 },
+    delta: { total_results: 0, unique_domains: 0, competitor_mentions: 0, avg_sentiment: 0, alert_count: 0 },
     sentiment_distribution: [],
     top_domains: [],
     theme_sentiments: [] as { name: string; count: number; sentiment: string; sentiment_score: number }[],
@@ -289,6 +289,9 @@ export async function GET(
     avg_sentiment: previousKpi
       ? Number((currentKpi.avg_sentiment - previousKpi.avg_sentiment).toFixed(2))
       : 0,
+    alert_count: previousKpi
+      ? calcDelta(currentKpi.alert_count, previousKpi.alert_count)
+      : 0,
   };
 
   return NextResponse.json({
@@ -313,7 +316,7 @@ export async function GET(
 async function getScanKPIs(client: any, scanId: string) {
   const { data: results } = await client
     .from('serp_results')
-    .select('domain, is_competitor, ai_analysis(sentiment_score)')
+    .select('domain, is_competitor, ai_analysis(sentiment_score, is_hi_priority)')
     .eq('scan_id', scanId);
 
   const totalResults = results?.length || 0;
@@ -322,12 +325,16 @@ async function getScanKPIs(client: any, scanId: string) {
 
   let sentimentSum = 0;
   let sentimentCount = 0;
+  let alertCount = 0;
   results?.forEach((r: { ai_analysis: unknown }) => {
     const raw = r.ai_analysis;
     const a = Array.isArray(raw) ? raw[0] : raw;
     if (a?.sentiment_score != null) {
       sentimentSum += a.sentiment_score;
       sentimentCount++;
+    }
+    if (a?.is_hi_priority) {
+      alertCount++;
     }
   });
 
@@ -336,6 +343,7 @@ async function getScanKPIs(client: any, scanId: string) {
     unique_domains: uniqueDomains,
     competitor_mentions: competitorMentions,
     avg_sentiment: sentimentCount > 0 ? Number((sentimentSum / sentimentCount).toFixed(2)) : 0,
+    alert_count: alertCount,
   };
 }
 

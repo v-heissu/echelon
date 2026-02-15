@@ -9,7 +9,7 @@ import { Select } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
 import { ResultsTable } from '@/components/dashboard/results-table';
 import { SerpResultWithAnalysis, Sentiment } from '@/types/database';
-import { ChevronLeft, ChevronRight, Filter, LayoutGrid, List } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Filter, LayoutGrid, List, AlertTriangle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
 export default function ResultsPage() {
@@ -28,6 +28,7 @@ export default function ResultsPage() {
   const [sentiment, setSentiment] = useState('');
   const [selectedScan, setSelectedScan] = useState('');
   const [competitorOnly, setCompetitorOnly] = useState(false);
+  const [priorityOnly, setPriorityOnly] = useState(false);
   const [tagFilter, setTagFilter] = useState('');
 
   const loadResults = useCallback(async () => {
@@ -40,6 +41,7 @@ export default function ResultsPage() {
     if (sentiment) params.set('sentiment', sentiment);
     if (selectedScan) params.set('scan_id', selectedScan);
     if (competitorOnly) params.set('competitor', 'true');
+    if (priorityOnly) params.set('priority', 'true');
     if (tagFilter) params.set('tag', tagFilter);
 
     const res = await fetch(`/api/projects/${slug}/results?${params}`);
@@ -56,7 +58,7 @@ export default function ResultsPage() {
       setTotal(data.total);
     }
     setLoading(false);
-  }, [slug, page, keyword, source, sentiment, selectedScan, competitorOnly, tagFilter]);
+  }, [slug, page, keyword, source, sentiment, selectedScan, competitorOnly, priorityOnly, tagFilter]);
 
   useEffect(() => {
     loadResults();
@@ -194,6 +196,20 @@ export default function ResultsPage() {
               </button>
               <label className="text-xs font-medium text-muted-foreground">Solo Competitor</label>
             </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => { setPriorityOnly(!priorityOnly); setPage(1); }}
+                className={`relative w-9 h-5 rounded-full transition-colors duration-200 ${priorityOnly ? 'bg-destructive' : 'bg-border'}`}
+              >
+                <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${priorityOnly ? 'left-4.5' : 'left-0.5'}`} />
+              </button>
+              <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                <AlertTriangle className="h-3 w-3" />
+                Solo Alert
+              </label>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -231,11 +247,25 @@ export default function ResultsPage() {
                             {analysis.sentiment}
                           </Badge>
                         )}
+                        {analysis?.is_hi_priority && (
+                          <span className="inline-flex items-center gap-1 text-xs bg-destructive/10 text-destructive rounded-full px-2 py-0.5 font-medium">
+                            <AlertTriangle className="h-3 w-3" />
+                            Alert
+                          </span>
+                        )}
                       </div>
                       <Badge variant="outline" className="text-xs flex-shrink-0">
                         {result.source === 'google_organic' ? 'Web' : 'News'}
                       </Badge>
                     </div>
+
+                    {/* Priority reason */}
+                    {analysis?.is_hi_priority && analysis.priority_reason && (
+                      <div className="flex items-start gap-1.5 text-xs text-destructive bg-destructive/5 rounded-lg px-3 py-2">
+                        <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                        {analysis.priority_reason}
+                      </div>
+                    )}
 
                     {/* Row 2: AI Summary */}
                     {analysis?.summary && (

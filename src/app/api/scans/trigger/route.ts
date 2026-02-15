@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { processOneJob } from '@/lib/worker/process-jobs';
+
+export const maxDuration = 300;
 
 export async function POST(request: Request) {
   const supabase = createServerSupabase();
@@ -70,8 +73,24 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Failed to create jobs: ' + jobsError.message }, { status: 500 });
   }
 
-  // Processing is browser-driven: the dashboard's processJobsLoop() detects
-  // the active scan and starts processing jobs automatically.
+  // Server-only: process ALL jobs inline within the 280s budget
+  const startTime = Date.now();
+  const MAX_RUNTIME = 280_000;
+  let processedCount = 0;
 
-  return NextResponse.json({ scan_id: scan.id, total_tasks: totalTasks }, { status: 201 });
+  while (Date.now() - startTime < MAX_RUNTIME) {
+    const result = await processOneJob();
+    if (result.status === 'no_jobs') break;
+    if (result.status === 'processed') processedCount++;
+    if (result.pendingCount === 0) break;
+
+    // Rate limiting: 4s delay between Gemini calls (15 RPM free tier)
+    await new Promise(resolve => setTimeout(resolve, 4000));
+  }
+
+  return NextResponse.json({
+    scan_id: scan.id,
+    total_tasks: totalTasks,
+    processed: processedCount,
+  }, { status: 201 });
 }

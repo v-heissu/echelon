@@ -18,6 +18,7 @@ export async function GET(
   const sentiment = searchParams.get('sentiment');
   const tag = searchParams.get('tag');
   const competitor = searchParams.get('competitor');
+  const priority = searchParams.get('priority');
   const scanId = searchParams.get('scan_id');
   const page = parseInt(searchParams.get('page') || '1');
   const limit = parseInt(searchParams.get('limit') || '50');
@@ -95,8 +96,16 @@ export async function GET(
     });
   }
 
+  if (priority === 'true') {
+    filtered = filtered.filter((r) => {
+      const raw = r.ai_analysis;
+      const a = Array.isArray(raw) ? raw[0] : raw;
+      return a?.is_hi_priority === true;
+    });
+  }
+
   // Adjust total count when post-filtering (since DB count doesn't reflect post-filters)
-  const adjustedTotal = (sentiment || tag) ? filtered.length : (count || 0);
+  const adjustedTotal = (sentiment || tag || priority) ? filtered.length : (count || 0);
 
   return NextResponse.json({
     results: filtered,

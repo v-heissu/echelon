@@ -1,13 +1,14 @@
 'use client';
 
 import { Card, CardContent } from '@/components/ui/card';
-import { TrendingUp, TrendingDown, Minus, BarChart3, Globe, Building2, Activity } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus, BarChart3, Globe, Building2, Activity, AlertTriangle } from 'lucide-react';
 
 interface KPIData {
   total_results: number;
   unique_domains: number;
   competitor_mentions: number;
   avg_sentiment: number;
+  alert_count: number;
 }
 
 interface KPICardsProps {
@@ -20,11 +21,12 @@ const cardConfig = [
   { key: 'unique_domains' as const, label: 'Domini Unici', icon: Globe, gradient: 'from-teal to-teal-light', format: 'number' },
   { key: 'competitor_mentions' as const, label: 'Menzioni Competitor', icon: Building2, gradient: 'from-orange to-gold', format: 'number' },
   { key: 'avg_sentiment' as const, label: 'Sentiment Medio', icon: Activity, gradient: 'from-positive to-teal', format: 'score' },
+  { key: 'alert_count' as const, label: 'Alert Prioritari', icon: AlertTriangle, gradient: 'from-destructive to-orange', format: 'number' },
 ];
 
 export function KPICards({ kpi, delta }: KPICardsProps) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-5">
       {cardConfig.map((card) => (
         <Card key={card.key} className="border-0 shadow-sm rounded-2xl overflow-hidden bg-white hover:shadow-md transition-shadow duration-300">
           <CardContent className="p-5">
@@ -37,10 +39,10 @@ export function KPICards({ kpi, delta }: KPICardsProps) {
             <div className="flex items-end justify-between">
               <p className="text-3xl font-bold text-primary tracking-tight">
                 {card.format === 'score'
-                  ? kpi[card.key].toFixed(2)
-                  : kpi[card.key].toLocaleString('it-IT')}
+                  ? (kpi[card.key] ?? 0).toFixed(2)
+                  : (kpi[card.key] ?? 0).toLocaleString('it-IT')}
               </p>
-              <DeltaIndicator value={delta[card.key]} isScore={card.format === 'score'} />
+              <DeltaIndicator value={delta[card.key] ?? 0} isScore={card.format === 'score'} />
             </div>
           </CardContent>
         </Card>
