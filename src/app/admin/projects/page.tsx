@@ -13,6 +13,7 @@ export default function ProjectsPage() {
   const [loading, setLoading] = useState(true);
   const [scanningSlug, setScanningSlug] = useState<string | null>(null);
   const [resettingSlug, setResettingSlug] = useState<string | null>(null);
+  const [scanDates, setScanDates] = useState<Record<string, string>>({});
 
   const loadProjects = useCallback(async () => {
     try {
@@ -42,14 +43,15 @@ export default function ProjectsPage() {
   async function triggerScan(slug: string) {
     setScanningSlug(slug);
     try {
+      const scanDate = scanDates[slug] || undefined;
       const res = await fetch('/api/scans/trigger', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ project_slug: slug }),
+        body: JSON.stringify({ project_slug: slug, scan_date: scanDate }),
       });
       if (res.ok) {
         const data = await res.json();
-        alert(`Scan avviata! ${data.total_tasks} task in elaborazione server-side. Controlla il progresso dalla dashboard.`);
+        alert(`${data.message}\n${data.total_tasks} task in elaborazione. Controlla il progresso dalla dashboard.`);
         loadProjects();
       } else {
         const data = await res.json();
@@ -194,6 +196,18 @@ export default function ProjectsPage() {
                         : '—'}
                     </span>
                   </div>
+                </div>
+
+                {/* Date picker for manual scan */}
+                <div className="flex items-center gap-2 mb-3">
+                  <label className="text-xs text-muted-foreground whitespace-nowrap">Scan fino a:</label>
+                  <input
+                    type="date"
+                    value={scanDates[project.slug] || ''}
+                    onChange={(e) => setScanDates(prev => ({ ...prev, [project.slug]: e.target.value }))}
+                    className="flex-1 text-xs px-2 py-1.5 rounded-lg border border-border bg-white text-primary focus:outline-none focus:ring-2 focus:ring-accent/30"
+                    max={new Date().toISOString().split('T')[0]}
+                  />
                 </div>
 
                 <div className="flex gap-2">

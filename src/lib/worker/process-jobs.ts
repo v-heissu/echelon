@@ -70,10 +70,10 @@ export async function processOneJob(): Promise<ProcessResult> {
   }
 
   try {
-    // 3. Fetch project settings
+    // 3. Fetch scan (with date range) and project settings
     const { data: scan } = await supabase
       .from('scans')
-      .select('project_id')
+      .select('project_id, date_from, date_to')
       .eq('id', job.scan_id)
       .single();
 
@@ -91,21 +91,58 @@ export async function processOneJob(): Promise<ProcessResult> {
     const language = (proj?.language as string) || 'it';
     const locationCode = (proj?.location_code as number) || 2380;
 
-    // 4. Fetch SERP data
+    // 4. Fetch SERP data (with date range for incremental scans)
     const dataforseo = new DataForSEOClient();
     const serpItems = await dataforseo.fetchSERP(
       job.keyword,
       job.source,
       language,
       locationCode,
-      30
+      30,
+      scan.date_from,
+      scan.date_to,
     );
+
+    // 4b. Deduplicate: remove URLs already seen in previous scans for this project
+    const urls = serpItems.map(item => item.url).filter(Boolean);
+    let existingUrls = new Set<string>();
+    if (urls.length > 0) {
+      const { data: existing } = await supabase
+        .from('serp_results')
+        .select('url, scans!inner(project_id)')
+        .eq('scans.project_id', scan.project_id)
+        .in('url', urls);
+      if (existing) {
+        existingUrls = new Set(existing.map((r: { url: string }) => r.url));
+      }
+    }
+    const newSerpItems = serpItems.filter(item => !existingUrls.has(item.url));
+    const skippedCount = serpItems.length - newSerpItems.length;
+    if (skippedCount > 0) {
+      console.log(`[processOneJob] Dedup: skipped ${skippedCount}/${serpItems.length} already-seen URLs for "${job.keyword}"`);
+    }
+
+    // If all results were duplicates, mark job as completed and move on
+    if (newSerpItems.length === 0) {
+      console.log(`[processOneJob] All results for "${job.keyword}" already seen, skipping`);
+      await supabase
+        .from('job_queue')
+        .update({ status: 'completed', completed_at: new Date().toISOString() })
+        .eq('id', job.id);
+      await supabase.rpc('increment_scan_progress', { scan_uuid: job.scan_id });
+      await checkAndCompleteScans(supabase);
+      const { count } = await supabase
+        .from('job_queue')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'pending');
+      return { status: 'processed', jobId: job.id, keyword: job.keyword, source: job.source, pendingCount: count || 0 };
+    }
 
     // 5. Extract content for top 10 URLs (all in parallel for speed)
     const TOP_EXTRACT = 10;
-    const excerpts: (string | null)[] = new Array(serpItems.length).fill(null);
+    const excerpts: (string | null)[] = new Array(newSerpItems.length).fill(null);
 
-    const toExtract = serpItems.slice(0, TOP_EXTRACT);
+    const toExtract = newSerpItems.slice(0, TOP_EXTRACT);
     const extractResults = await Promise.allSettled(
       toExtract.map((item) => extractContent(item.url))
     );
@@ -113,8 +150,8 @@ export async function processOneJob(): Promise<ProcessResult> {
       excerpts[idx] = result.status === 'fulfilled' ? result.value : null;
     });
 
-    // 6. Save SERP results
-    const serpData = serpItems.map((item, idx) => ({
+    // 6. Save SERP results (only new, non-duplicate items)
+    const serpData = newSerpItems.map((item, idx) => ({
       scan_id: job.scan_id,
       keyword: job.keyword,
       source: job.source,
