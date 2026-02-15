@@ -244,27 +244,37 @@ Output format:
       ? `\nCONTESTO PROGETTO: ${projectContext.project_context}`
       : '';
 
-    const prompt = `Sei un analista di intelligence competitiva. Il tuo compito è identificare risultati SERP OFF-TOPIC rispetto al progetto monitorato.
+    const prompt = `Sei un analista di intelligence competitiva esperto. Il tuo compito è identificare risultati SERP OFF-TOPIC rispetto al progetto monitorato. Devi essere ACCURATO e DECISO nel filtrare i risultati non pertinenti.
 
 PROGETTO: ${projectContext.name}
 SETTORE: ${projectContext.industry}
 KEYWORD MONITORATE: ${JSON.stringify(projectContext.keywords)}
 COMPETITOR NOTI: ${JSON.stringify(projectContext.competitors)}${contextBlock}
 
+ATTENZIONE AL CONTESTO SEMANTICO: Le keyword possono avere significati diversi in settori diversi.
+Esempi di disambiguazione:
+- "gara" nel digital marketing = gara d'appalto, bando di gara, competizione commerciale. NON sport/corse/atletica.
+- "campagna" nel marketing = campagna pubblicitaria/comunicazione. NON campagna militare/agricola.
+- "conversione" nel digital = conversion rate, lead. NON conversione religiosa/valutaria.
+- "posizionamento" nel marketing = SEO, brand positioning. NON posizionamento GPS/militare.
+Usa SEMPRE il settore del progetto ("${projectContext.industry}") per disambiguare termini polisemici.
+
 Per OGNI risultato, valuta se è PERTINENTE al progetto oppure OFF-TOPIC.
 Un risultato è OFF-TOPIC se:
 - NON riguarda il brand, l'azienda, il settore o i competitor del progetto
 - Parla di un omonimo in un contesto completamente diverso (es: keyword "Apple" → risultato su mele frutta, non Apple Inc.)
+- Usa una keyword del progetto ma in un settore/contesto COMPLETAMENTE DIVERSO (es: progetto di digital marketing e il risultato parla di sport, cucina, meteo, gossip, ecc.)
 - È spam, contenuto generico non correlato, o un falso positivo della SERP
 - Non ha alcuna rilevanza per il monitoraggio della reputazione o della concorrenza del progetto
+- Parla di argomenti generici (sport, cronaca, intrattenimento) che non hanno legami con il settore "${projectContext.industry}"
 
 Un risultato è PERTINENTE se:
 - Menziona direttamente il brand, i prodotti o i servizi dell'azienda
-- Riguarda il settore di riferimento o i competitor
-- Contiene informazioni utili per il monitoraggio della reputazione
-- Anche se indirettamente collegato al contesto del progetto
+- Riguarda SPECIFICAMENTE il settore "${projectContext.industry}" o i competitor
+- Contiene informazioni utili per il monitoraggio della reputazione nel contesto del settore
+- È collegato al contesto del progetto in modo chiaro e diretto (non tangenziale)
 
-Sii conservativo: in caso di dubbio, il risultato è PERTINENTE (is_off_topic: false).
+IMPORTANTE: Non basta che un risultato contenga una keyword monitorata per essere pertinente. Deve essere pertinente AL SETTORE e AL CONTESTO del progetto. Sii rigoroso nel filtrare risultati che usano le stesse parole ma in contesti diversi.
 
 Rispondi SOLO con JSON valido.
 Output format:

@@ -181,11 +181,12 @@ export async function GET(
     }
   }
 
-  // Top domains
+  // Top domains (exclude off-topic results)
   const { data: domainResults } = await admin
     .from('serp_results')
-    .select('domain, is_competitor')
-    .eq('scan_id', currentScanId);
+    .select('domain, is_competitor, ai_analysis!inner(is_off_topic)')
+    .eq('scan_id', currentScanId)
+    .eq('ai_analysis.is_off_topic', false);
 
   const domainCounts = new Map<string, { count: number; is_competitor: boolean }>();
   domainResults?.forEach((r) => {
@@ -199,13 +200,14 @@ export async function GET(
     .sort((a, b) => b.count - a.count)
     .slice(0, 10);
 
-  // Theme sentiments: compute average sentiment per theme from current scan
+  // Theme sentiments: compute average sentiment per theme from current scan (exclude off-topic)
   const themeSentiments: { name: string; count: number; sentiment: string; sentiment_score: number }[] = [];
   {
     const { data: themeResults } = await admin
       .from('serp_results')
-      .select('ai_analysis(themes, sentiment, sentiment_score)')
-      .eq('scan_id', currentScanId);
+      .select('ai_analysis!inner(themes, sentiment, sentiment_score, is_off_topic)')
+      .eq('scan_id', currentScanId)
+      .eq('ai_analysis.is_off_topic', false);
 
     if (themeResults) {
       const themeMap = new Map<string, { count: number; scoreSum: number; scoreCount: number; sentiments: Record<string, number> }>();

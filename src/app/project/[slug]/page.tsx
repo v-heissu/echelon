@@ -3,7 +3,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { KPICards } from '@/components/dashboard/kpi-cards';
-import { AiBriefing } from '@/components/dashboard/ai-briefing';
 import { DomainBarChart } from '@/components/dashboard/domain-bar-chart';
 import { SentimentChart } from '@/components/dashboard/sentiment-chart';
 import { ThemeTreemap } from '@/components/dashboard/theme-treemap';
@@ -337,16 +336,15 @@ export default function ProjectDashboard() {
         </div>
       )}
 
-      {/* 1. AI Briefing */}
-      <AiBriefing briefing={data.ai_briefing} scanCount={data.scan_count} slug={slug} />
-
-      {/* 2. Executive Summary */}
+      {/* 1. Executive Summary (with integrated AI Briefing) */}
       <ExecutiveSummary
         kpi={data.kpi}
         delta={data.delta}
         themes={themes}
         topDomains={data.top_domains}
         scanCount={data.scan_count}
+        briefing={data.ai_briefing}
+        slug={slug}
       />
 
       {/* 3. KPI Cards */}

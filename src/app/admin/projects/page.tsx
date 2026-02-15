@@ -96,6 +96,7 @@ export default function ProjectsPage() {
       const res = await fetch(`/api/projects/${slug}/filter`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ force: true }),
       });
       if (res.ok) {
         const data = await res.json();

@@ -21,10 +21,12 @@ const GEMINI_DELAY_MS = 4000; // 15 RPM free tier
  *
  * @param projectId - Project UUID
  * @param scanId - Optional: limit to a specific scan. If null, evaluates all unfiltered results.
+ * @param force - If true, re-evaluate ALL results (reset previous evaluations first).
  */
 export async function runContextFilter(
   projectId: string,
-  scanId?: string | null
+  scanId?: string | null,
+  force?: boolean
 ): Promise<ContextFilterResult> {
   const supabase = createAdminClient();
 
@@ -48,7 +50,35 @@ export async function runContextFilter(
     errors: [],
   };
 
-  // 2. Fetch results that haven't been evaluated yet (is_off_topic = false AND off_topic_reason IS NULL)
+  // 2a. If force mode, reset all previous evaluations so they get re-checked
+  if (force) {
+    // Get all analysis IDs for this project (optionally scoped to a scan)
+    let resetQuery = supabase
+      .from('ai_analysis')
+      .select('id, serp_results!inner(scan_id, scans!inner(project_id))')
+      .eq('serp_results.scans.project_id', projectId)
+      .not('off_topic_reason', 'is', null);
+
+    if (scanId) {
+      resetQuery = resetQuery.eq('serp_results.scan_id', scanId);
+    }
+
+    const { data: toReset } = await resetQuery;
+    if (toReset && toReset.length > 0) {
+      const ids = toReset.map((a: { id: string }) => a.id);
+      // Reset in batches of 200
+      for (let i = 0; i < ids.length; i += 200) {
+        const batch = ids.slice(i, i + 200);
+        await supabase
+          .from('ai_analysis')
+          .update({ is_off_topic: false, off_topic_reason: null })
+          .in('id', batch);
+      }
+      console.log(`[context-filter] Force mode: reset ${ids.length} previously evaluated results`);
+    }
+  }
+
+  // 2b. Fetch results that haven't been evaluated yet (is_off_topic = false AND off_topic_reason IS NULL)
   //    We treat "false + null reason" as "not yet evaluated" vs "false + non-null reason" as "evaluated, on-topic"
   let query = supabase
     .from('ai_analysis')
