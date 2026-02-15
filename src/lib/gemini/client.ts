@@ -40,6 +40,17 @@ interface GeminiResponse {
   discovered_competitors: string[];
 }
 
+export interface TagGroupInput {
+  name: string;
+  slug: string;
+  count: number;
+}
+
+export interface TagGroup {
+  canonical: string;
+  duplicates: string[];
+}
+
 export interface RelevanceInput {
   id: string;
   title: string;
@@ -288,5 +299,70 @@ ${JSON.stringify(results, null, 2)}`;
     }
 
     throw new Error('Gemini relevance evaluation failed after retries');
+  }
+
+  async findDuplicateTags(
+    projectContext: { name: string; industry: string },
+    tags: TagGroupInput[]
+  ): Promise<TagGroup[]> {
+    const model = this.genAI.getGenerativeModel({
+      model: this.modelName,
+      generationConfig: {
+        temperature: 0,
+        responseMimeType: 'application/json',
+      },
+    });
+
+    const prompt = `Sei un analista di dati. Il tuo compito è identificare tag RIDONDANTI o DUPLICATI semantici in una lista di tag usati per classificare risultati SERP.
+
+PROGETTO: ${projectContext.name}
+SETTORE: ${projectContext.industry}
+
+Raggruppa i tag che sono semanticamente equivalenti. Esempi di duplicati:
+- Singolare/plurale: "regulation" e "regulations"
+- Abbreviazioni: "artificial intelligence" e "AI", "machine learning" e "ML"
+- Varianti ortografiche: "cyber security", "cybersecurity", "cyber-security"
+- Sinonimi stretti nello stesso dominio: "data breach" e "data leak"
+- Stessa parola con/senza accenti o caratteri speciali
+
+NON raggruppare tag che sono semplicemente correlati ma distinti (es: "privacy" e "data protection" sono diversi).
+
+Per ogni gruppo, indica:
+- "canonical": il nome del tag da tenere (preferisci quello con count più alto, o quello più descrittivo/completo)
+- "duplicates": array dei NOMI dei tag duplicati da unire nel canonical (escluso il canonical stesso)
+
+Rispondi SOLO con JSON valido. Se non ci sono duplicati, rispondi con un array vuoto.
+Output format:
+{
+  "groups": [
+    { "canonical": "artificial intelligence", "duplicates": ["ai", "a.i."] },
+    { "canonical": "cybersecurity", "duplicates": ["cyber security", "cyber-security"] }
+  ]
+}
+
+TAG DA ANALIZZARE:
+${JSON.stringify(tags, null, 2)}`;
+
+    const maxRetries = 3;
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        const result = await model.generateContent(prompt);
+        const text = result.response.text();
+        const parsed = JSON.parse(text) as { groups: TagGroup[] };
+
+        if (!parsed.groups || !Array.isArray(parsed.groups)) {
+          throw new Error('Invalid tag grouping response structure');
+        }
+
+        return parsed.groups;
+      } catch (error) {
+        if (attempt === maxRetries - 1) {
+          throw error;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 500 * (attempt + 1)));
+      }
+    }
+
+    throw new Error('Gemini tag grouping failed after retries');
   }
 }

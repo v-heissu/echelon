@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Plus, ExternalLink, Play, Search, Calendar, Globe, FolderOpen, Trash2, Loader2, Unlock, Settings, Filter } from 'lucide-react';
+import { Plus, ExternalLink, Play, Search, Calendar, Globe, FolderOpen, Trash2, Loader2, Unlock, Settings, Filter, Tags } from 'lucide-react';
 import { Project } from '@/types/database';
 
 export default function ProjectsPage() {
@@ -14,6 +14,7 @@ export default function ProjectsPage() {
   const [scanningSlug, setScanningSlug] = useState<string | null>(null);
   const [resettingSlug, setResettingSlug] = useState<string | null>(null);
   const [filteringSlug, setFilteringSlug] = useState<string | null>(null);
+  const [normalizingSlug, setNormalizingSlug] = useState<string | null>(null);
   const [scanDates, setScanDates] = useState<Record<string, string>>({});
 
   const loadProjects = useCallback(async () => {
@@ -110,6 +111,27 @@ export default function ProjectsPage() {
     }
   }
 
+  async function triggerNormalize(slug: string) {
+    setNormalizingSlug(slug);
+    try {
+      const res = await fetch(`/api/projects/${slug}/normalize-tags`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        alert(`Tag normalizer completato per "${slug}":\n${data.total_tags} tag analizzati\n${data.groups_found} gruppi di duplicati\n${data.tags_merged} tag uniti\n${data.tags_remaining} tag rimanenti`);
+      } else {
+        const data = await res.json();
+        alert('Errore: ' + data.error);
+      }
+    } catch {
+      alert('Errore di rete. Riprova.');
+    } finally {
+      setNormalizingSlug(null);
+    }
+  }
+
   async function deleteProject(slug: string, name: string) {
     if (!confirm(`Eliminare "${name}"? Tutti i dati (scan, risultati, analisi) saranno persi.`)) return;
     try {
@@ -164,6 +186,7 @@ export default function ProjectsPage() {
           const isScanning = scanningSlug === project.slug;
           const isResetting = resettingSlug === project.slug;
           const isFiltering = filteringSlug === project.slug;
+          const isNormalizing = normalizingSlug === project.slug;
           const hasRunningScan = project.scans?.some(s => s.status === 'running');
 
           return (
@@ -266,6 +289,20 @@ export default function ProjectsPage() {
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
                     ) : (
                       <Filter className="h-3.5 w-3.5" />
+                    )}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8 text-muted-foreground hover:text-accent"
+                    onClick={() => triggerNormalize(project.slug)}
+                    disabled={isNormalizing}
+                    title="Normalizza tag duplicati"
+                  >
+                    {isNormalizing ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Tags className="h-3.5 w-3.5" />
                     )}
                   </Button>
                   <Button
