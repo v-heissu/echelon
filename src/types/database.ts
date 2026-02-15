@@ -29,6 +29,7 @@ export interface Project {
   alert_keywords: string[];
   project_context: string | null;
   last_filter_at: string | null;
+  last_normalize_at: string | null;
   is_active: boolean;
   created_at: string;
 }
