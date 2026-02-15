@@ -90,25 +90,64 @@ export default function ProjectsPage() {
     }
   }
 
+  const [filterProgress, setFilterProgress] = useState<string | null>(null);
+
   async function triggerFilter(slug: string) {
     setFilteringSlug(slug);
+    let totalEvaluated = 0;
+    let totalOffTopic = 0;
+    let totalOnTopic = 0;
+
     try {
-      const res = await fetch(`/api/projects/${slug}/filter`, {
+      // First call: force reset + process first batch
+      setFilterProgress('Reset valutazioni precedenti...');
+      const resetRes = await fetch(`/api/projects/${slug}/filter`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ force: true }),
       });
-      if (res.ok) {
-        const data = await res.json();
-        alert(`Context filter completato per "${slug}":\n${data.total_evaluated} risultati valutati\n${data.marked_off_topic} off-topic\n${data.marked_on_topic} pertinenti`);
-      } else {
-        const data = await res.json();
+      if (!resetRes.ok) {
+        const data = await resetRes.json();
         alert('Errore: ' + data.error);
+        return;
       }
+      let batch = await resetRes.json();
+      totalEvaluated += batch.total_evaluated;
+      totalOffTopic += batch.marked_off_topic;
+      totalOnTopic += batch.marked_on_topic;
+
+      // Loop until done
+      while (batch.status === 'processing') {
+        setFilterProgress(`Filtro in corso... ${totalEvaluated} valutati, ${batch.remaining} rimanenti`);
+
+        // Rate limit between batches
+        await new Promise(resolve => setTimeout(resolve, 2000));
+
+        const res = await fetch(`/api/projects/${slug}/filter`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+        });
+        if (!res.ok) {
+          const data = await res.json();
+          alert('Errore durante il batch: ' + data.error);
+          break;
+        }
+        batch = await res.json();
+        totalEvaluated += batch.total_evaluated;
+        totalOffTopic += batch.marked_off_topic;
+        totalOnTopic += batch.marked_on_topic;
+      }
+
+      alert(`Context filter completato per "${slug}":\n${totalEvaluated} risultati valutati\n${totalOffTopic} off-topic\n${totalOnTopic} pertinenti`);
     } catch {
-      alert('Errore di rete. Riprova.');
+      if (totalEvaluated > 0) {
+        alert(`Filtro parziale per "${slug}":\n${totalEvaluated} risultati valutati finora\n${totalOffTopic} off-topic\n${totalOnTopic} pertinenti\n\nRiprova per completare i rimanenti.`);
+      } else {
+        alert('Errore di rete. Riprova.');
+      }
     } finally {
       setFilteringSlug(null);
+      setFilterProgress(null);
     }
   }
 
@@ -329,6 +368,9 @@ export default function ProjectsPage() {
                     <Trash2 className="h-3.5 w-3.5" />
                   </Button>
                 </div>
+                {isFiltering && filterProgress && (
+                  <p className="text-xs text-accent mt-2">{filterProgress}</p>
+                )}
               </CardContent>
             </Card>
           );

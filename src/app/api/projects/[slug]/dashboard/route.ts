@@ -254,35 +254,31 @@ export async function GET(
       .order('started_at', { ascending: true });
 
     if (timelineScans && timelineScans.length > 0) {
-      const scanIds = timelineScans.map((s) => s.id);
-      const { data: articleCounts } = await admin
-        .from('serp_results')
-        .select('scan_id')
-        .in('scan_id', scanIds);
+      // Use count queries per scan to avoid Supabase default 1000-row limit
+      const countPromises = timelineScans.map(async (scan) => {
+        const { count } = await admin
+          .from('serp_results')
+          .select('id', { count: 'exact', head: true })
+          .eq('scan_id', scan.id);
+        return { scan, count: count || 0 };
+      });
 
-      if (articleCounts && articleCounts.length > 0) {
-        // Count articles per scan_id
-        const countsByScan = new Map<string, number>();
-        articleCounts.forEach((r) => {
-          countsByScan.set(r.scan_id, (countsByScan.get(r.scan_id) || 0) + 1);
+      const scanCounts = await Promise.all(countPromises);
+
+      for (const { scan, count } of scanCounts) {
+        if (count === 0) continue;
+        // Use date_from (the monitored period start) as the timeline date.
+        // For the first scan (date_from=null, covers "beginning of time" → date_to),
+        // fall back to date_to, then started_at.
+        publicationTimeline.push({
+          date: scan.date_from || scan.date_to || scan.started_at,
+          count,
+          scanId: scan.id,
         });
-
-        for (const scan of timelineScans) {
-          const count = countsByScan.get(scan.id) || 0;
-          if (count === 0) continue;
-          // Use date_from (the monitored period start) as the timeline date.
-          // For the first scan (date_from=null, covers "beginning of time" → date_to),
-          // fall back to date_to, then started_at.
-          publicationTimeline.push({
-            date: scan.date_from || scan.date_to || scan.started_at,
-            count,
-            scanId: scan.id,
-          });
-        }
-
-        // Sort by displayed date (not started_at) so timeline is chronological
-        publicationTimeline.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
       }
+
+      // Sort by displayed date (not started_at) so timeline is chronological
+      publicationTimeline.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     }
   }
 
