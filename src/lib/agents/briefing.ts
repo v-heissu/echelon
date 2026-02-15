@@ -54,14 +54,28 @@ export async function regenerateBriefing(projectId: string): Promise<string | nu
 
   const projectInfo = `PROGETTO: ${project.name}${project.industry ? ` | Settore: ${project.industry}` : ''}${project.project_context ? `\nCONTESTO: ${project.project_context}` : ''}\n\n`;
 
-  const prompt = `Sei un analista di intelligence competitiva. ${project.project_context ? 'Tieni conto del contesto e dello scopo del progetto per dare un briefing mirato e rilevante. ' : ''}Confronta questi dati SERP della scan corrente con la scan precedente. In 3-5 frasi in italiano: cosa è cambiato? Quali temi sono emersi o scomparsi? Quali competitor si sono mossi? Il sentiment è migliorato o peggiorato? Sii conciso e actionable.
+  const prompt = `Sei un analista senior di intelligence competitiva. ${project.project_context ? 'Tieni conto del contesto e dello scopo del progetto per dare un briefing mirato e rilevante. ' : ''}Confronta questi dati SERP della scan corrente con la scan precedente.
 
-IMPORTANTE: Ignora i domini onnipresenti e generici (facebook.com, google.com, youtube.com, linkedin.com, twitter.com, x.com, instagram.com, wikipedia.org, reddit.com, amazon.com, tiktok.com, etc.). Concentrati solo sui domini rilevanti per il settore e il mercato del progetto, citando solo esempi da quella coorte o dai competitor indicati nella creazione del progetto.
+Scrivi un executive briefing strutturato in italiano con queste sezioni (usa esattamente questi titoli):
+
+**Panoramica** — 1-2 frasi di sintesi: risultati totali, variazione rispetto alla scan precedente, sentiment generale.
+**Temi chiave** — Quali temi sono emersi, cresciuti, o calati? Evidenzia i 3-5 più rilevanti.
+**Competitor** — Movimenti dei competitor: chi è salito/sceso in visibilità? Nuove presenze?
+**Sentiment** — Il sentiment è migliorato o peggiorato? In quali aree? Segnala eventuali aree critiche.
+**Azioni suggerite** — 2-3 raccomandazioni concrete e actionable basate sui dati.
+
+REGOLE DI FORMATTAZIONE:
+- Usa **grassetto** per nomi di brand, competitor, temi chiave e dati numerici importanti
+- Usa le sezioni con il titolo in grassetto seguito da " — " e il testo (tutto su una riga per sezione)
+- NON usare elenchi puntati, markdown heading (#), o altro markup
+- Ogni sezione deve essere un paragrafo compatto separato da una riga vuota
+
+IMPORTANTE: Ignora i domini onnipresenti e generici (facebook.com, google.com, youtube.com, linkedin.com, twitter.com, x.com, instagram.com, wikipedia.org, reddit.com, amazon.com, tiktok.com, etc.). Concentrati solo sui domini rilevanti per il settore e il mercato del progetto.
 
 ${projectInfo}DATI:
 ${JSON.stringify({ current: currentStats, previous: previousStats }, null, 2)}
 
-Rispondi SOLO con il testo del briefing, nessun JSON, nessun markdown.`;
+Rispondi SOLO con il testo del briefing formattato come indicato sopra.`;
 
   const result = await model.generateContent(prompt);
   const briefingText = result.response.text().trim();

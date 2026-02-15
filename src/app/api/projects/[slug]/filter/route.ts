@@ -1,14 +1,18 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { runContextFilter } from '@/lib/agents/context-filter';
+import { runContextFilterBatch, resetFilterEvaluations } from '@/lib/agents/context-filter';
 
-export const maxDuration = 300;
+export const maxDuration = 60;
 
 /**
  * POST /api/projects/[slug]/filter
- * One-shot: run the context-filter agent for a specific project.
- * Optional body: { scan_id?: string }
+ * Browser-driven batch processing: each call processes ONE batch.
+ * Client calls in a loop until remaining === 0.
+ *
+ * Body:
+ *  - force?: boolean  (on first call: reset all previous evaluations)
+ *  - scan_id?: string (optional: limit to a specific scan)
  */
 export async function POST(
   request: Request,
@@ -42,11 +46,17 @@ export async function POST(
     scanId = body.scan_id || null;
     force = body.force === true;
   } catch {
-    // No body or invalid JSON — that's fine, filter all unprocessed results
+    // No body or invalid JSON — that's fine
   }
 
   try {
-    const result = await runContextFilter(project.id, scanId, force);
+    // If force, reset first (idempotent, only resets rows that have evaluations)
+    if (force) {
+      await resetFilterEvaluations(project.id, scanId);
+    }
+
+    // Process one batch
+    const result = await runContextFilterBatch(project.id, scanId);
     return NextResponse.json(result);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';

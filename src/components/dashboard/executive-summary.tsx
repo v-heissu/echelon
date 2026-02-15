@@ -43,6 +43,61 @@ function sentimentLabel(score: number): { text: string; color: string } {
   return { text: 'molto negativo', color: 'text-destructive' };
 }
 
+/**
+ * Render text with **bold** markers as styled <strong> elements.
+ * Also handles section headers like "**Panoramica** — ..."
+ */
+function FormattedBriefing({ text }: { text: string }) {
+  const paragraphs = text.split(/\n\n+/);
+
+  return (
+    <div className="space-y-3">
+      {paragraphs.map((paragraph, i) => {
+        const trimmed = paragraph.trim();
+        if (!trimmed) return null;
+
+        // Check if this is a section header: starts with **Title** —
+        const sectionMatch = trimmed.match(/^\*\*(.+?)\*\*\s*[—–-]\s*/);
+
+        if (sectionMatch) {
+          const title = sectionMatch[1];
+          const body = trimmed.slice(sectionMatch[0].length);
+          return (
+            <div key={i}>
+              <p className="text-sm leading-relaxed">
+                <span className="font-bold text-primary">{title}</span>
+                <span className="text-primary/40 mx-1.5">|</span>
+                <RichText text={body} />
+              </p>
+            </div>
+          );
+        }
+
+        return (
+          <p key={i} className="text-sm leading-relaxed">
+            <RichText text={trimmed} />
+          </p>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Render inline **bold** markers */
+function RichText({ text }: { text: string }) {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  return (
+    <>
+      {parts.map((part, i) => {
+        if (part.startsWith('**') && part.endsWith('**')) {
+          return <strong key={i} className="font-semibold text-primary">{part.slice(2, -2)}</strong>;
+        }
+        return <span key={i}>{part}</span>;
+      })}
+    </>
+  );
+}
+
 function DeltaBadge({ value, label, invert }: { value: number; label: string; invert?: boolean }) {
   if (value === 0) return null;
   const positive = invert ? value < 0 : value > 0;
@@ -113,7 +168,7 @@ export function ExecutiveSummary({ kpi, delta, themes, topDomains, scanCount, br
         <div className="text-sm text-primary/85 leading-relaxed space-y-2.5 rounded-xl bg-[#f8f9fb] p-4">
           {/* AI Briefing (replaces template when available) */}
           {hasBriefing ? (
-            <p className="whitespace-pre-line">{currentBriefing}</p>
+            <FormattedBriefing text={currentBriefing!} />
           ) : (
             <>
               {/* Template-based summary */}
