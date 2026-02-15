@@ -3,6 +3,7 @@ import { DataForSEOClient } from '@/lib/dataforseo/client';
 import { extractContent } from '@/lib/extraction/content';
 import { GeminiClient } from '@/lib/gemini/client';
 import { extractDomain } from '@/lib/utils';
+import { generateBriefingForScan } from '@/lib/agents/briefing';
 
 export interface ProcessResult {
   status: 'processed' | 'no_jobs' | 'error';
@@ -463,7 +464,7 @@ async function checkAndCompleteScans(supabase: ReturnType<typeof createAdminClie
 
       // Generate AI briefing after scan completion (non-blocking)
       try {
-        await generateAiBriefing(supabase, scan.id);
+        await generateBriefingForScan(scan.id);
       } catch (briefingError) {
         console.error('[checkAndCompleteScans] AI briefing generation failed:', briefingError);
       }
@@ -471,148 +472,3 @@ async function checkAndCompleteScans(supabase: ReturnType<typeof createAdminClie
   }
 }
 
-async function generateAiBriefing(supabase: ReturnType<typeof createAdminClient>, scanId: string) {
-  // 1. Get the project_id from the scan
-  const { data: scan } = await supabase
-    .from('scans')
-    .select('project_id')
-    .eq('id', scanId)
-    .single();
-
-  if (!scan?.project_id) {
-    console.error('[generateAiBriefing] Scan not found or missing project_id:', scanId);
-    return;
-  }
-
-  // Fetch project info for context-aware briefing
-  const { data: project } = await supabase
-    .from('projects')
-    .select('name, industry, project_context')
-    .eq('id', scan.project_id)
-    .single();
-
-  // 2. Get current scan's aggregated data
-  const currentStats = await getScanStats(supabase, scanId);
-
-  // 3. Get previous completed scan for comparison
-  const { data: previousScans } = await supabase
-    .from('scans')
-    .select('id')
-    .eq('project_id', scan.project_id)
-    .eq('status', 'completed')
-    .neq('id', scanId)
-    .order('completed_at', { ascending: false })
-    .limit(1);
-
-  let previousStats = null;
-  if (previousScans && previousScans.length > 0) {
-    previousStats = await getScanStats(supabase, previousScans[0].id);
-  }
-
-  // If there's no previous scan, we can still generate a briefing but it won't have comparison data
-  if (!previousStats) {
-    console.log('[generateAiBriefing] No previous scan for comparison, skipping briefing for scan:', scanId);
-    return;
-  }
-
-  // 4. Call Gemini to generate the briefing
-  const gemini = new GeminiClient();
-  const model = gemini['genAI'].getGenerativeModel({
-    model: 'gemini-2.0-flash',
-    generationConfig: {
-      temperature: 0.3,
-    },
-  });
-
-  const projectInfo = project
-    ? `PROGETTO: ${project.name}${project.industry ? ` | Settore: ${project.industry}` : ''}${project.project_context ? `\nCONTESTO: ${project.project_context}` : ''}\n\n`
-    : '';
-
-  const prompt = `Sei un analista di intelligence competitiva. ${project?.project_context ? 'Tieni conto del contesto e dello scopo del progetto per dare un briefing mirato e rilevante. ' : ''}Confronta questi dati SERP della scan corrente con la scan precedente. In 3-5 frasi in italiano: cosa è cambiato? Quali temi sono emersi o scomparsi? Quali competitor si sono mossi? Il sentiment è migliorato o peggiorato? Sii conciso e actionable.
-
-IMPORTANTE: Ignora i domini onnipresenti e generici (facebook.com, google.com, youtube.com, linkedin.com, twitter.com, x.com, instagram.com, wikipedia.org, reddit.com, amazon.com, tiktok.com, etc.). Concentrati solo sui domini rilevanti per il settore e il mercato del progetto, citando solo esempi da quella coorte o dai competitor indicati nella creazione del progetto.
-
-${projectInfo}DATI:
-${JSON.stringify({ current: currentStats, previous: previousStats }, null, 2)}
-
-Rispondi SOLO con il testo del briefing, nessun JSON, nessun markdown.`;
-
-  const result = await model.generateContent(prompt);
-  const briefingText = result.response.text().trim();
-
-  // 5. Save the briefing to the scan
-  const { error: updateError } = await supabase
-    .from('scans')
-    .update({ ai_briefing: briefingText })
-    .eq('id', scanId);
-
-  if (updateError) {
-    console.error('[generateAiBriefing] Failed to save briefing:', updateError.message);
-  } else {
-    console.log('[generateAiBriefing] Briefing saved for scan:', scanId);
-  }
-}
-
-async function getScanStats(supabase: ReturnType<typeof createAdminClient>, scanId: string) {
-  // Get SERP results with AI analysis
-  const { data: results } = await supabase
-    .from('serp_results')
-    .select('domain, is_competitor, ai_analysis(themes, sentiment, sentiment_score)')
-    .eq('scan_id', scanId);
-
-  const totalResults = results?.length || 0;
-  const uniqueDomains = new Set(results?.map((r: { domain: string }) => r.domain)).size;
-  const competitorMentions = results?.filter((r: { is_competitor: boolean }) => r.is_competitor).length || 0;
-
-  // Sentiment distribution
-  const sentimentCounts: Record<string, number> = { positive: 0, negative: 0, neutral: 0, mixed: 0 };
-  let sentimentSum = 0;
-  let sentimentCount = 0;
-
-  // Theme counts
-  const themeCounts = new Map<string, number>();
-
-  // Competitor domains
-  const competitorDomains = new Set<string>();
-
-  results?.forEach((r: { domain: string; is_competitor: boolean; ai_analysis: unknown }) => {
-    const raw = r.ai_analysis;
-    const a = Array.isArray(raw) ? raw[0] : raw;
-
-    if (a?.sentiment) {
-      const s = a.sentiment as string;
-      if (s in sentimentCounts) sentimentCounts[s]++;
-    }
-    if (a?.sentiment_score != null) {
-      sentimentSum += a.sentiment_score;
-      sentimentCount++;
-    }
-    if (a?.themes && Array.isArray(a.themes)) {
-      for (const t of a.themes) {
-        if (t.name) {
-          const name = t.name.toLowerCase().trim();
-          themeCounts.set(name, (themeCounts.get(name) || 0) + 1);
-        }
-      }
-    }
-    if (r.is_competitor && r.domain) {
-      competitorDomains.add(r.domain);
-    }
-  });
-
-  // Top themes (sorted by count, top 15)
-  const topThemes = Array.from(themeCounts.entries())
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 15)
-    .map(([name, count]) => ({ name, count }));
-
-  return {
-    total_results: totalResults,
-    unique_domains: uniqueDomains,
-    competitor_mentions: competitorMentions,
-    avg_sentiment: sentimentCount > 0 ? Number((sentimentSum / sentimentCount).toFixed(2)) : 0,
-    sentiment_distribution: sentimentCounts,
-    top_themes: topThemes,
-    competitor_domains: Array.from(competitorDomains),
-  };
-}
