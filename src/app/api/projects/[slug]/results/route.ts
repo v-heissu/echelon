@@ -20,6 +20,7 @@ export async function GET(
   const entity = searchParams.get('entity');
   const competitor = searchParams.get('competitor');
   const priority = searchParams.get('priority');
+  const offTopic = searchParams.get('off_topic');
   const scanId = searchParams.get('scan_id');
   const page = parseInt(searchParams.get('page') || '1');
   const limit = parseInt(searchParams.get('limit') || '50');
@@ -47,7 +48,7 @@ export async function GET(
   }
 
   // Use inner join when filtering on ai_analysis columns at DB level
-  const needsInnerJoin = !!sentiment || priority === 'true';
+  const needsInnerJoin = !!sentiment || priority === 'true' || offTopic !== null;
   const aiJoin = needsInnerJoin ? 'ai_analysis!inner(*)' : 'ai_analysis(*)';
   const needsPostFilter = !!tag || !!entity;
 
@@ -68,6 +69,8 @@ export async function GET(
   // DB-level filters via inner join
   if (sentiment) query = query.eq('ai_analysis.sentiment', sentiment);
   if (priority === 'true') query = query.eq('ai_analysis.is_hi_priority', true);
+  if (offTopic === 'true') query = query.eq('ai_analysis.is_off_topic', true);
+  if (offTopic === 'false') query = query.eq('ai_analysis.is_off_topic', false);
 
   let resultsList;
   let total;
