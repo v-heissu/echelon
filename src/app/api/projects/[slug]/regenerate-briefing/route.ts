@@ -19,11 +19,6 @@ export async function POST(
 
   const admin = createAdminClient();
 
-  const { data: profile } = await admin.from('users').select('role').eq('id', user.id).maybeSingle();
-  if (!profile || profile.role !== 'admin') {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
-
   const { data: project } = await admin
     .from('projects')
     .select('id')
@@ -32,6 +27,20 @@ export async function POST(
 
   if (!project) {
     return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+  }
+
+  // Verify access: admin sees all, clients only assigned projects
+  const { data: profile } = await admin.from('users').select('role').eq('id', user.id).maybeSingle();
+  if (profile?.role !== 'admin') {
+    const { data: membership } = await admin
+      .from('project_users')
+      .select('user_id')
+      .eq('project_id', project.id)
+      .eq('user_id', user.id)
+      .maybeSingle();
+    if (!membership) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
   }
 
   try {

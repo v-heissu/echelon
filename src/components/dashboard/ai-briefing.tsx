@@ -13,20 +13,24 @@ interface AiBriefingProps {
 export function AiBriefing({ briefing, scanCount, slug }: AiBriefingProps) {
   const [currentBriefing, setCurrentBriefing] = useState(briefing);
   const [regenerating, setRegenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function handleRegenerate() {
     setRegenerating(true);
+    setError(null);
     try {
       const res = await fetch(`/api/projects/${slug}/regenerate-briefing`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       });
+      const data = await res.json();
       if (res.ok) {
-        const data = await res.json();
         setCurrentBriefing(data.briefing);
+      } else {
+        setError(data.error || 'Errore durante la generazione del briefing');
       }
     } catch {
-      // Silently fail
+      setError('Errore di rete. Riprova più tardi.');
     } finally {
       setRegenerating(false);
     }
@@ -70,8 +74,11 @@ export function AiBriefing({ briefing, scanCount, slug }: AiBriefingProps) {
             </button>
           </div>
           <p className="text-sm text-muted-foreground">
-            Hai abbastanza dati per generare il briefing AI. Clicca il pulsante per generarlo.
+            {regenerating
+              ? 'Generazione in corso...'
+              : 'Hai abbastanza dati per generare il briefing AI. Clicca il pulsante per generarlo.'}
           </p>
+          {error && <p className="text-sm text-red-500 mt-2">{error}</p>}
         </CardContent>
       </Card>
     );
@@ -95,6 +102,7 @@ export function AiBriefing({ briefing, scanCount, slug }: AiBriefingProps) {
           </button>
         </div>
         <p className="text-sm text-primary/80 leading-relaxed whitespace-pre-line">{currentBriefing}</p>
+        {error && <p className="text-sm text-red-500 mt-2">{error}</p>}
       </CardContent>
     </Card>
   );
