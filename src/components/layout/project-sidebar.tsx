@@ -12,6 +12,7 @@ import {
   Tag,
   Users,
   Download,
+  History,
   LogOut,
   ArrowLeft,
 } from 'lucide-react';
@@ -34,6 +35,7 @@ export function ProjectSidebar({ slug, projectName, isAdmin }: ProjectSidebarPro
     { href: `${basePath}/trends`, label: 'Trend', icon: TrendingUp },
     { href: `${basePath}/tags`, label: 'Tag Intelligence', icon: Tag },
     { href: `${basePath}/entities`, label: 'Entità', icon: Users },
+    { href: `${basePath}/scans`, label: 'Scansioni', icon: History },
     { href: `${basePath}/export`, label: 'Export', icon: Download },
   ];
 

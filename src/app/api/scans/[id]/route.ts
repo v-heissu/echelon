@@ -14,16 +14,6 @@ export async function DELETE(
 
   const admin = createAdminClient();
 
-  const { data: profile } = await admin
-    .from('users')
-    .select('role')
-    .eq('id', user.id)
-    .single();
-
-  if (profile?.role !== 'admin') {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
-
   const { data: scan } = await admin
     .from('scans')
     .select('id, project_id, status')
@@ -32,6 +22,25 @@ export async function DELETE(
 
   if (!scan) {
     return NextResponse.json({ error: 'Scan not found' }, { status: 404 });
+  }
+
+  // Allow admins or project members
+  const { data: profile } = await admin
+    .from('users')
+    .select('role')
+    .eq('id', user.id)
+    .single();
+
+  if (profile?.role !== 'admin') {
+    const { data: membership } = await admin
+      .from('project_users')
+      .select('user_id')
+      .eq('project_id', scan.project_id)
+      .eq('user_id', user.id)
+      .maybeSingle();
+    if (!membership) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
   }
 
   if (scan.status === 'running') {
