@@ -12,13 +12,15 @@ export async function GET(
 
   const admin = createAdminClient();
 
-  const { data: project } = await admin
+  const { data: project, error: projErr } = await admin
     .from('projects')
     .select('id')
     .eq('slug', params.slug)
     .single();
 
-  if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+  if (projErr || !project) {
+    return NextResponse.json({ error: projErr?.message || 'Project not found' }, { status: 404 });
+  }
 
   // Verify access
   const { data: profile } = await admin.from('users').select('role').eq('id', user.id).maybeSingle();
@@ -32,25 +34,25 @@ export async function GET(
     if (!membership) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  const { data: scans } = await admin
+  const { data: scans, error: scansErr } = await admin
     .from('scans')
-    .select('id, status, trigger_type, started_at, completed_at, total_tasks, completed_tasks, date_from, date_to')
+    .select('id, status, trigger_type, started_at, completed_at, total_tasks, completed_tasks')
     .eq('project_id', project.id)
     .order('started_at', { ascending: false });
 
+  if (scansErr) {
+    return NextResponse.json({ error: `DB error: ${scansErr.message}` }, { status: 500 });
+  }
+
   // Get result counts per scan
-  const scanIds = (scans || []).map(s => s.id);
   const resultCounts = new Map<string, number>();
 
-  if (scanIds.length > 0) {
-    // Count serp_results per scan in batches
-    for (const scanId of scanIds) {
-      const { count } = await admin
-        .from('serp_results')
-        .select('id', { count: 'exact', head: true })
-        .eq('scan_id', scanId);
-      resultCounts.set(scanId, count || 0);
-    }
+  for (const scan of scans || []) {
+    const { count } = await admin
+      .from('serp_results')
+      .select('id', { count: 'exact', head: true })
+      .eq('scan_id', scan.id);
+    resultCounts.set(scan.id, count || 0);
   }
 
   const enrichedScans = (scans || []).map(s => ({
