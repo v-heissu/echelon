@@ -14,6 +14,7 @@ interface KPIData {
 interface KPICardsProps {
   kpi: KPIData;
   delta: KPIData;
+  onAlertClick?: () => void;
 }
 
 const cardConfig = [
@@ -24,29 +25,42 @@ const cardConfig = [
   { key: 'alert_count' as const, label: 'Alert Prioritari', icon: AlertTriangle, gradient: 'from-destructive to-orange', format: 'number' },
 ];
 
-export function KPICards({ kpi, delta }: KPICardsProps) {
+export function KPICards({ kpi, delta, onAlertClick }: KPICardsProps) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-5">
-      {cardConfig.map((card) => (
-        <Card key={card.key} className="border-0 shadow-sm rounded-2xl overflow-hidden bg-white hover:shadow-md transition-shadow duration-300">
-          <CardContent className="p-5">
-            <div className="flex items-center justify-between mb-4">
-              <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">{card.label}</p>
-              <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${card.gradient} flex items-center justify-center shadow-sm`}>
-                <card.icon className="h-5 w-5 text-white" />
+      {cardConfig.map((card) => {
+        const isClickable = card.key === 'alert_count' && !!onAlertClick && (kpi.alert_count ?? 0) > 0;
+
+        return (
+          <Card
+            key={card.key}
+            className={`border-0 shadow-sm rounded-2xl overflow-hidden bg-white transition-shadow duration-300 ${
+              isClickable ? 'hover:shadow-lg cursor-pointer ring-1 ring-transparent hover:ring-destructive/20' : 'hover:shadow-md'
+            }`}
+            onClick={isClickable ? onAlertClick : undefined}
+          >
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">{card.label}</p>
+                <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${card.gradient} flex items-center justify-center shadow-sm`}>
+                  <card.icon className="h-5 w-5 text-white" />
+                </div>
               </div>
-            </div>
-            <div className="flex items-end justify-between">
-              <p className="text-3xl font-bold text-primary tracking-tight">
-                {card.format === 'score'
-                  ? (kpi[card.key] ?? 0).toFixed(2)
-                  : (kpi[card.key] ?? 0).toLocaleString('it-IT')}
-              </p>
-              <DeltaIndicator value={delta[card.key] ?? 0} isScore={card.format === 'score'} />
-            </div>
-          </CardContent>
-        </Card>
-      ))}
+              <div className="flex items-end justify-between">
+                <p className="text-3xl font-bold text-primary tracking-tight">
+                  {card.format === 'score'
+                    ? (kpi[card.key] ?? 0).toFixed(2)
+                    : (kpi[card.key] ?? 0).toLocaleString('it-IT')}
+                </p>
+                <DeltaIndicator value={delta[card.key] ?? 0} isScore={card.format === 'score'} />
+              </div>
+              {isClickable && (
+                <p className="text-[10px] text-destructive/60 mt-2 font-medium">Clicca per vedere i dettagli →</p>
+              )}
+            </CardContent>
+          </Card>
+        );
+      })}
     </div>
   );
 }

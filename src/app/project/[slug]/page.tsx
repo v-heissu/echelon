@@ -340,7 +340,11 @@ export default function ProjectDashboard() {
       <AiBriefing briefing={data.ai_briefing} scanCount={data.scan_count} />
 
       {/* 2. KPI Cards */}
-      <KPICards kpi={data.kpi} delta={data.delta} />
+      <KPICards
+        kpi={data.kpi}
+        delta={data.delta}
+        onAlertClick={() => router.push(`/project/${slug}/results?priority=true`)}
+      />
 
       {/* 3. Top Domini (promoted) + 4. Sentiment */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
