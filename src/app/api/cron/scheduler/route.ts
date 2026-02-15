@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { processOneJob } from '@/lib/worker/process-jobs';
 
 export const maxDuration = 300;
 
@@ -29,6 +28,7 @@ export async function GET(request: Request) {
   }
 
   const triggeredProjects: string[] = [];
+  const baseUrl = new URL(request.url).origin;
 
   for (const project of projects) {
     let shouldRun = false;
@@ -75,26 +75,21 @@ export async function GET(request: Request) {
 
     await supabase.from('job_queue').insert(jobs);
     triggeredProjects.push(project.slug);
-  }
 
-  // Process as many jobs as possible within the 280s budget (Fluid Compute 300s)
-  const startTime = Date.now();
-  const MAX_RUNTIME = 280_000;
-  let processedCount = 0;
-
-  while (Date.now() - startTime < MAX_RUNTIME) {
-    const result = await processOneJob();
-    if (result.status === 'no_jobs') break;
-    if (result.status === 'processed') processedCount++;
-    if (result.pendingCount === 0) break;
-
-    // Rate limiting: 4s delay between Gemini calls
-    await new Promise(resolve => setTimeout(resolve, 4000));
+    // Fire-and-forget processing for this scan
+    fetch(`${baseUrl}/api/scans/${scan.id}/run`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.CRON_SECRET}`,
+        'Content-Type': 'application/json',
+      },
+    }).catch((err) => {
+      console.error(`[cron] Fire-and-forget failed for scan ${scan.id}:`, err);
+    });
   }
 
   return NextResponse.json({
-    message: `Triggered ${triggeredProjects.length} projects, processed ${processedCount} jobs`,
+    message: `Triggered ${triggeredProjects.length} projects`,
     projects: triggeredProjects,
-    processedCount,
   });
 }
