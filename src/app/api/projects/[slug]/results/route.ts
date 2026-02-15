@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { deleteResultsByIds } from '@/lib/agents/blacklist';
 
 export async function GET(
   request: Request,
@@ -20,7 +21,6 @@ export async function GET(
   const entity = searchParams.get('entity');
   const competitor = searchParams.get('competitor');
   const priority = searchParams.get('priority');
-  const offTopic = searchParams.get('off_topic');
   const scanId = searchParams.get('scan_id');
   const page = parseInt(searchParams.get('page') || '1');
   const limit = parseInt(searchParams.get('limit') || '50');
@@ -48,7 +48,7 @@ export async function GET(
   }
 
   // Use inner join when filtering on ai_analysis columns at DB level
-  const needsInnerJoin = !!sentiment || priority === 'true' || offTopic !== null;
+  const needsInnerJoin = !!sentiment || priority === 'true';
   const aiJoin = needsInnerJoin ? 'ai_analysis!inner(*)' : 'ai_analysis(*)';
   const needsPostFilter = !!tag || !!entity;
 
@@ -69,8 +69,6 @@ export async function GET(
   // DB-level filters via inner join
   if (sentiment) query = query.eq('ai_analysis.sentiment', sentiment);
   if (priority === 'true') query = query.eq('ai_analysis.is_hi_priority', true);
-  if (offTopic === 'true') query = query.eq('ai_analysis.is_off_topic', true);
-  if (offTopic === 'false') query = query.eq('ai_analysis.is_off_topic', false);
 
   let resultsList;
   let total;
@@ -148,4 +146,48 @@ export async function GET(
       tags: (tagsResult.data || []).map((t) => t.name as string),
     },
   });
+}
+
+/**
+ * DELETE /api/projects/[slug]/results
+ * Manually delete specific results by ID.
+ * Body: { ids: string[] }
+ */
+export async function DELETE(
+  request: Request,
+  { params }: { params: { slug: string } }
+) {
+  const supabase = createServerSupabase();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  const admin = createAdminClient();
+
+  const { data: profile } = await admin.from('users').select('role').eq('id', user.id).maybeSingle();
+  if (!profile || profile.role !== 'admin') {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  const { data: project } = await admin
+    .from('projects')
+    .select('id')
+    .eq('slug', params.slug)
+    .single();
+
+  if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+
+  let ids: string[];
+  try {
+    const body = await request.json();
+    ids = body.ids;
+  } catch {
+    return NextResponse.json({ error: 'Invalid body' }, { status: 400 });
+  }
+
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return NextResponse.json({ error: 'ids array required' }, { status: 400 });
+  }
+
+  const deleted = await deleteResultsByIds(project.id, ids);
+  return NextResponse.json({ deleted });
 }
