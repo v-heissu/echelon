@@ -262,7 +262,7 @@ export default function TrendsPage() {
         </p>
       </div>
 
-      {/* Section 1 — Alert Box */}
+      {/* Section 1 — Alert Box with quick filters */}
       {nonStableThemes.length > 0 && (
         <Card className="border-0 border-l-4 border-l-orange bg-orange/5 shadow-md rounded-xl">
           <CardContent className="p-5">
@@ -270,21 +270,60 @@ export default function TrendsPage() {
               <AlertTriangle className="h-5 w-5 text-orange" />
               <h3 className="font-semibold text-primary">Temi in Movimento</h3>
             </div>
-            <p className="text-sm text-muted-foreground mb-4">
+            <div className="flex flex-wrap gap-2 mb-4">
               {emergingCount > 0 && (
-                <span className="font-medium text-orange">{emergingCount} temi emergenti</span>
+                <button
+                  onClick={() => setDirectionFilter(directionFilter === 'emerging' ? 'all' : 'emerging')}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all cursor-pointer ${
+                    directionFilter === 'emerging'
+                      ? 'bg-orange text-white shadow-sm'
+                      : 'bg-orange/10 text-orange hover:bg-orange/20'
+                  }`}
+                >
+                  <TrendingUp className="h-3.5 w-3.5" />
+                  {emergingCount} emergenti
+                </button>
               )}
-              {emergingCount > 0 && (decliningCount > 0 || newCount > 0) && ', '}
               {decliningCount > 0 && (
-                <span className="font-medium text-destructive">{decliningCount} in calo</span>
+                <button
+                  onClick={() => setDirectionFilter(directionFilter === 'declining' ? 'all' : 'declining')}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all cursor-pointer ${
+                    directionFilter === 'declining'
+                      ? 'bg-destructive text-white shadow-sm'
+                      : 'bg-destructive/10 text-destructive hover:bg-destructive/20'
+                  }`}
+                >
+                  <TrendingDown className="h-3.5 w-3.5" />
+                  {decliningCount} in calo
+                </button>
               )}
-              {decliningCount > 0 && newCount > 0 && ', '}
               {newCount > 0 && (
-                <span className="font-medium text-accent">{newCount} nuovi</span>
+                <button
+                  onClick={() => setDirectionFilter(directionFilter === 'new' ? 'all' : 'new')}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all cursor-pointer ${
+                    directionFilter === 'new'
+                      ? 'bg-accent text-white shadow-sm'
+                      : 'bg-accent/10 text-accent hover:bg-accent/20'
+                  }`}
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                  {newCount} nuovi
+                </button>
               )}
-            </p>
+              {directionFilter !== 'all' && (
+                <button
+                  onClick={() => setDirectionFilter('all')}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm text-muted-foreground hover:text-primary hover:bg-muted/50 transition-colors cursor-pointer"
+                >
+                  <Minus className="h-3.5 w-3.5" />
+                  Mostra tutti
+                </button>
+              )}
+            </div>
             <div className="flex flex-wrap gap-2">
-              {nonStableThemes.map((trend) => (
+              {nonStableThemes
+                .filter(t => directionFilter === 'all' || t.direction === directionFilter)
+                .map((trend) => (
                 <button
                   key={trend.theme}
                   onClick={() => navigateToTheme(trend.theme)}
