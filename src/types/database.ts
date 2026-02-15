@@ -28,6 +28,7 @@ export interface Project {
   location_code: number;
   alert_keywords: string[];
   project_context: string | null;
+  last_filter_at: string | null;
   is_active: boolean;
   created_at: string;
 }
@@ -87,6 +88,8 @@ export interface AiAnalysis {
   language_detected: string;
   is_hi_priority: boolean;
   priority_reason: string | null;
+  is_off_topic: boolean;
+  off_topic_reason: string | null;
   analyzed_at: string;
 }
 

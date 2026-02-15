@@ -40,6 +40,21 @@ interface GeminiResponse {
   discovered_competitors: string[];
 }
 
+export interface RelevanceInput {
+  id: string;
+  title: string;
+  url: string;
+  snippet: string;
+  summary: string;
+  themes: { name: string }[];
+}
+
+export interface RelevanceResult {
+  id: string;
+  is_off_topic: boolean;
+  reason: string | null;
+}
+
 export class GeminiClient {
   private genAI: GoogleGenerativeAI;
   private modelName = 'gemini-2.0-flash';
@@ -194,5 +209,84 @@ Output format:
     }
 
     throw new Error('Gemini autofill failed after retries');
+  }
+
+  async evaluateRelevance(
+    projectContext: {
+      name: string;
+      industry: string;
+      keywords: string[];
+      competitors: string[];
+      project_context: string | null;
+    },
+    results: RelevanceInput[]
+  ): Promise<RelevanceResult[]> {
+    const model = this.genAI.getGenerativeModel({
+      model: this.modelName,
+      generationConfig: {
+        temperature: 0,
+        responseMimeType: 'application/json',
+      },
+    });
+
+    const contextBlock = projectContext.project_context
+      ? `\nCONTESTO PROGETTO: ${projectContext.project_context}`
+      : '';
+
+    const prompt = `Sei un analista di intelligence competitiva. Il tuo compito è identificare risultati SERP OFF-TOPIC rispetto al progetto monitorato.
+
+PROGETTO: ${projectContext.name}
+SETTORE: ${projectContext.industry}
+KEYWORD MONITORATE: ${JSON.stringify(projectContext.keywords)}
+COMPETITOR NOTI: ${JSON.stringify(projectContext.competitors)}${contextBlock}
+
+Per OGNI risultato, valuta se è PERTINENTE al progetto oppure OFF-TOPIC.
+Un risultato è OFF-TOPIC se:
+- NON riguarda il brand, l'azienda, il settore o i competitor del progetto
+- Parla di un omonimo in un contesto completamente diverso (es: keyword "Apple" → risultato su mele frutta, non Apple Inc.)
+- È spam, contenuto generico non correlato, o un falso positivo della SERP
+- Non ha alcuna rilevanza per il monitoraggio della reputazione o della concorrenza del progetto
+
+Un risultato è PERTINENTE se:
+- Menziona direttamente il brand, i prodotti o i servizi dell'azienda
+- Riguarda il settore di riferimento o i competitor
+- Contiene informazioni utili per il monitoraggio della reputazione
+- Anche se indirettamente collegato al contesto del progetto
+
+Sii conservativo: in caso di dubbio, il risultato è PERTINENTE (is_off_topic: false).
+
+Rispondi SOLO con JSON valido.
+Output format:
+{
+  "results": [
+    { "id": "uuid", "is_off_topic": false, "reason": null },
+    { "id": "uuid", "is_off_topic": true, "reason": "Breve spiegazione del perché è off-topic" }
+  ]
+}
+
+RISULTATI DA VALUTARE:
+${JSON.stringify(results, null, 2)}`;
+
+    const maxRetries = 3;
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        const result = await model.generateContent(prompt);
+        const text = result.response.text();
+        const parsed = JSON.parse(text) as { results: RelevanceResult[] };
+
+        if (!parsed.results || !Array.isArray(parsed.results)) {
+          throw new Error('Invalid relevance response structure');
+        }
+
+        return parsed.results;
+      } catch (error) {
+        if (attempt === maxRetries - 1) {
+          throw error;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 500 * (attempt + 1)));
+      }
+    }
+
+    throw new Error('Gemini relevance evaluation failed after retries');
   }
 }
