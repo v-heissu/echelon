@@ -1,9 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { processOneJob } from '@/lib/worker/process-jobs';
-
-export const maxDuration = 300;
 
 export async function POST(request: Request) {
   const supabase = createServerSupabase();
@@ -68,29 +65,26 @@ export async function POST(request: Request) {
   const { error: jobsError } = await admin.from('job_queue').insert(jobs);
 
   if (jobsError) {
-    // Cleanup the scan since jobs failed to insert
     await admin.from('scans').delete().eq('id', scan.id);
     return NextResponse.json({ error: 'Failed to create jobs: ' + jobsError.message }, { status: 500 });
   }
 
-  // Server-only: process ALL jobs inline within the 280s budget
-  const startTime = Date.now();
-  const MAX_RUNTIME = 280_000;
-  let processedCount = 0;
+  // Fire-and-forget: kick off the processing endpoint (runs with maxDuration=300)
+  const baseUrl = new URL(request.url).origin;
+  fetch(`${baseUrl}/api/scans/${scan.id}/run`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${process.env.CRON_SECRET}`,
+      'Content-Type': 'application/json',
+    },
+  }).catch((err) => {
+    console.error('[trigger] Fire-and-forget to /run failed:', err);
+  });
 
-  while (Date.now() - startTime < MAX_RUNTIME) {
-    const result = await processOneJob();
-    if (result.status === 'no_jobs') break;
-    if (result.status === 'processed') processedCount++;
-    if (result.pendingCount === 0) break;
-
-    // Rate limiting: 4s delay between Gemini calls (15 RPM free tier)
-    await new Promise(resolve => setTimeout(resolve, 4000));
-  }
-
+  // Return immediately — dashboard will poll for progress
   return NextResponse.json({
     scan_id: scan.id,
     total_tasks: totalTasks,
-    processed: processedCount,
+    message: 'Scan avviata! Elaborazione server-side in corso.',
   }, { status: 201 });
 }

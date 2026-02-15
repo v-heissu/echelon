@@ -49,16 +49,16 @@ export default function ProjectsPage() {
       });
       if (res.ok) {
         const data = await res.json();
-        alert(`Scan completata! ${data.processed}/${data.total_tasks} task elaborati.`);
+        alert(`Scan avviata! ${data.total_tasks} task in elaborazione server-side. Controlla il progresso dalla dashboard.`);
+        loadProjects();
       } else {
         const data = await res.json();
         alert('Errore: ' + data.error);
+        setScanningSlug(null);
       }
     } catch {
-      alert('Errore di rete o timeout. Controlla lo stato dalla dashboard.');
-    } finally {
+      alert('Errore di rete. Riprova.');
       setScanningSlug(null);
-      loadProjects();
     }
   }
 
