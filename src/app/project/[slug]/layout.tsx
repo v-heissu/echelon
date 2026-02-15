@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { ProjectSidebar } from '@/components/layout/project-sidebar';
+import { Footer } from '@/components/layout/footer';
 import { redirect } from 'next/navigation';
 
 export default async function ProjectLayout({
@@ -39,7 +40,10 @@ export default async function ProjectLayout({
         projectName={project?.name || params.slug}
         isAdmin={profile?.role === 'admin'}
       />
-      <main className="flex-1 content-bg p-8 overflow-auto">{children}</main>
+      <div className="flex-1 content-bg overflow-auto flex flex-col">
+        <main className="flex-1 p-8">{children}</main>
+        <Footer />
+      </div>
     </div>
   );
 }

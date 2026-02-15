@@ -172,8 +172,9 @@ export async function GET(
         }
       });
 
-      // Use date_from (monitored period start) like publication timeline
-      // Fall back to date_to, then started_at
+      // Use date_to (period end) as the chart date — this is unique per scan.
+      // date_from can collide: scan 1 (date_from=null) falls back to date_to
+      // which equals scan 2's date_from.
       sentimentTimeline.push({
         date: scan.date_to || scan.date_from || scan.started_at,
         ...counts,
