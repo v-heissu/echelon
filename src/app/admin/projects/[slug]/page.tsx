@@ -92,12 +92,17 @@ export default function EditProjectPage() {
       }),
     });
 
+    const resData = await res.json();
     if (res.ok) {
-      showToast('success', 'Progetto aggiornato con successo');
-      loadProject(); // Reload to confirm persistence
+      const savedKw = Array.isArray(resData.alert_keywords) ? resData.alert_keywords : [];
+      if (form.alert_keywords.length > 0 && savedKw.length === 0) {
+        showToast('error', 'Alert keywords non salvati. Esegui: ALTER TABLE projects ADD COLUMN IF NOT EXISTS alert_keywords JSONB NOT NULL DEFAULT \'[]\'::jsonb;');
+      } else {
+        showToast('success', 'Progetto aggiornato con successo');
+      }
+      loadProject();
     } else {
-      const data = await res.json();
-      showToast('error', 'Errore: ' + data.error);
+      showToast('error', 'Errore: ' + resData.error);
     }
     setSaving(false);
   }

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Plus, ExternalLink, Play, Search, Calendar, Globe, FolderOpen, Trash2, Loader2, Unlock } from 'lucide-react';
+import { Plus, ExternalLink, Play, Search, Calendar, Globe, FolderOpen, Trash2, Loader2, Unlock, Settings } from 'lucide-react';
 import { Project } from '@/types/database';
 
 export default function ProjectsPage() {
@@ -146,12 +146,16 @@ export default function ProjectsPage() {
               <div className="h-1 bg-gradient-to-r from-accent to-teal" />
               <CardContent className="p-5">
                 <div className="flex items-start justify-between mb-4">
-                  <Link
-                    href={`/admin/projects/${project.slug}`}
-                    className="text-base font-semibold text-primary hover:text-accent transition-colors"
-                  >
-                    {project.name}
-                  </Link>
+                  <div className="flex items-center gap-2">
+                    <span className="text-base font-semibold text-primary">{project.name}</span>
+                    <Link
+                      href={`/admin/projects/${project.slug}`}
+                      className="p-1 rounded-md text-muted-foreground hover:text-accent hover:bg-accent/10 transition-colors"
+                      title="Impostazioni progetto"
+                    >
+                      <Settings className="h-4 w-4" />
+                    </Link>
+                  </div>
                   <div className="flex items-center gap-1.5">
                     {(isScanning || hasRunningScan) && (
                       <Badge variant="outline" className="text-accent border-accent/30 gap-1">
