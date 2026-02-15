@@ -117,13 +117,46 @@ export default function ProjectDashboard() {
     return () => { mountedRef.current = false; };
   }, [loadData]);
 
+  // Browser-driven processing loop: calls /api/scans/process to process one job at a time
+  const processingRef = useRef(false);
+  const processJobsLoop = useCallback(async () => {
+    if (processingRef.current) return;
+    processingRef.current = true;
+
+    try {
+      while (mountedRef.current) {
+        const res = await fetch('/api/scans/process', { method: 'POST' });
+        if (!res.ok) break;
+        const result = await res.json();
+
+        if (result.status === 'no_jobs') break;
+        if (result.status === 'error') {
+          console.warn('[processJobsLoop] Job error:', result.error);
+        }
+        if (result.pendingCount === 0) break;
+
+        // Rate limiting: 4s delay between Gemini calls (15 RPM free tier)
+        await new Promise(resolve => setTimeout(resolve, 4000));
+      }
+    } catch {
+      // Network error, will retry on next trigger
+    } finally {
+      processingRef.current = false;
+      // Reload dashboard data after processing completes
+      if (mountedRef.current) loadData();
+    }
+  }, [loadData]);
+
   // Poll: fast during scan (3s for status, 15s for full data), slow otherwise (60s)
+  // Also kick off browser-driven processing when a scan is active
   useEffect(() => {
     if (loading) return;
 
     const isActive = !!data?.active_scan;
 
     if (isActive) {
+      // Start browser-driven processing
+      processJobsLoop();
       const statusInterval = setInterval(pollScanStatus, 3000);
       const dataInterval = setInterval(loadData, 15000);
       return () => { clearInterval(statusInterval); clearInterval(dataInterval); };
@@ -131,7 +164,7 @@ export default function ProjectDashboard() {
       const interval = setInterval(loadData, 60000);
       return () => clearInterval(interval);
     }
-  }, [loading, data?.active_scan, loadData, pollScanStatus]);
+  }, [loading, data?.active_scan, loadData, pollScanStatus, processJobsLoop]);
 
   if (loading) {
     return (
@@ -191,14 +224,14 @@ export default function ProjectDashboard() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-semibold text-primary">
-                    Scan in elaborazione server-side
+                    Scan in elaborazione
                   </span>
                   <span className="text-sm font-bold text-accent tabular-nums">
                     {activeScan.completed_tasks}/{activeScan.total_tasks} ({scanProgress}%)
                   </span>
                 </div>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Il server sta elaborando i risultati. Questa pagina si aggiorna automaticamente.
+                  Elaborazione in corso. Non chiudere questa pagina fino al completamento.
                 </p>
               </div>
             </div>

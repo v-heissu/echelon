@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { processOneJob } from '@/lib/worker/process-jobs';
 
 export const maxDuration = 300;
 
@@ -28,7 +29,6 @@ export async function GET(request: Request) {
   }
 
   const triggeredProjects: string[] = [];
-  const baseUrl = new URL(request.url).origin;
 
   for (const project of projects) {
     let shouldRun = false;
@@ -75,21 +75,35 @@ export async function GET(request: Request) {
 
     await supabase.from('job_queue').insert(jobs);
     triggeredProjects.push(project.slug);
+  }
 
-    // Fire-and-forget processing for this scan
-    fetch(`${baseUrl}/api/scans/${scan.id}/run`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${process.env.CRON_SECRET}`,
-        'Content-Type': 'application/json',
-      },
-    }).catch((err) => {
-      console.error(`[cron] Fire-and-forget failed for scan ${scan.id}:`, err);
-    });
+  // Process jobs inline within 280s budget (cron IS awaited by Vercel)
+  const startTime = Date.now();
+  const MAX_RUNTIME = 280_000;
+  let processedCount = 0;
+  let errorCount = 0;
+
+  while (Date.now() - startTime < MAX_RUNTIME) {
+    try {
+      const result = await processOneJob();
+      if (result.status === 'no_jobs') break;
+      if (result.status === 'processed') processedCount++;
+      if (result.status === 'error') errorCount++;
+      if (result.pendingCount === 0) break;
+
+      // Rate limiting: 4s delay between Gemini calls (15 RPM free tier)
+      await new Promise(resolve => setTimeout(resolve, 4000));
+    } catch (err) {
+      console.error('[cron] Processing error:', err);
+      errorCount++;
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    }
   }
 
   return NextResponse.json({
     message: `Triggered ${triggeredProjects.length} projects`,
     projects: triggeredProjects,
+    processed: processedCount,
+    errors: errorCount,
   });
 }

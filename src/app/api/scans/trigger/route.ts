@@ -69,19 +69,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Failed to create jobs: ' + jobsError.message }, { status: 500 });
   }
 
-  // Fire-and-forget: kick off the processing endpoint (runs with maxDuration=300)
-  const baseUrl = new URL(request.url).origin;
-  fetch(`${baseUrl}/api/scans/${scan.id}/run`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${process.env.CRON_SECRET}`,
-      'Content-Type': 'application/json',
-    },
-  }).catch((err) => {
-    console.error('[trigger] Fire-and-forget to /run failed:', err);
-  });
-
-  // Return immediately — dashboard will poll for progress
+  // Return immediately — dashboard's processJobsLoop will pick up and process the jobs
   return NextResponse.json({
     scan_id: scan.id,
     total_tasks: totalTasks,
