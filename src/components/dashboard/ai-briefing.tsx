@@ -52,7 +52,29 @@ export function AiBriefing({ briefing, scanCount, slug }: AiBriefingProps) {
   }
 
   if (!currentBriefing) {
-    return null;
+    return (
+      <Card className="border-0 shadow-sm rounded-2xl bg-white">
+        <CardContent className="p-5">
+          <div className="flex items-center gap-2.5 mb-3">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-accent to-teal flex items-center justify-center shadow-sm">
+              <Sparkles className="w-4.5 h-4.5 text-white" />
+            </div>
+            <h3 className="font-semibold text-primary text-[15px] flex-1">AI Briefing</h3>
+            <button
+              onClick={handleRegenerate}
+              disabled={regenerating}
+              className="p-1.5 rounded-lg text-muted-foreground hover:text-accent hover:bg-accent/5 transition-colors disabled:opacity-50"
+              title="Genera briefing"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${regenerating ? 'animate-spin' : ''}`} />
+            </button>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Hai abbastanza dati per generare il briefing AI. Clicca il pulsante per generarlo.
+          </p>
+        </CardContent>
+      </Card>
+    );
   }
 
   return (
