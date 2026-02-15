@@ -94,6 +94,7 @@ export default function EditProjectPage() {
 
     if (res.ok) {
       showToast('success', 'Progetto aggiornato con successo');
+      loadProject(); // Reload to confirm persistence
     } else {
       const data = await res.json();
       showToast('error', 'Errore: ' + data.error);

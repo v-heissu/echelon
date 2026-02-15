@@ -1,50 +1,73 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
-import { useParams } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
+import { useEffect, useState, useCallback, useRef } from 'react';
+import { useParams, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
 import { ResultsTable } from '@/components/dashboard/results-table';
 import { SerpResultWithAnalysis, Sentiment } from '@/types/database';
-import { ChevronLeft, ChevronRight, Filter, LayoutGrid, List, AlertTriangle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Filter, LayoutGrid, List, AlertTriangle, RotateCcw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+
+interface FilterOptions {
+  keywords: string[];
+  scans: { id: string; completed_at: string }[];
+  tags: string[];
+}
 
 export default function ResultsPage() {
   const params = useParams();
+  const urlSearchParams = useSearchParams();
   const slug = params.slug as string;
   const [results, setResults] = useState<SerpResultWithAnalysis[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
-  const [scans, setScans] = useState<{ id: string; completed_at: string }[]>([]);
+  const [filterOptions, setFilterOptions] = useState<FilterOptions>({ keywords: [], scans: [], tags: [] });
   const [viewMode, setViewMode] = useState<'intelligence' | 'table'>('intelligence');
+  const initializedRef = useRef(false);
 
-  // Filters
-  const [keyword, setKeyword] = useState('');
-  const [source, setSource] = useState('');
-  const [sentiment, setSentiment] = useState('');
-  const [selectedScan, setSelectedScan] = useState('');
-  const [competitorOnly, setCompetitorOnly] = useState(false);
-  const [priorityOnly, setPriorityOnly] = useState(false);
-  const [tagFilter, setTagFilter] = useState('');
+  // Filters - initialize from URL params for drill-down from dashboard
+  const [keyword, setKeyword] = useState(urlSearchParams.get('keyword') || '');
+  const [source, setSource] = useState(urlSearchParams.get('source') || '');
+  const [sentiment, setSentiment] = useState(urlSearchParams.get('sentiment') || '');
+  const [selectedScan, setSelectedScan] = useState(urlSearchParams.get('scan_id') || '');
+  const [competitorOnly, setCompetitorOnly] = useState(urlSearchParams.get('competitor') === 'true');
+  const [priorityOnly, setPriorityOnly] = useState(urlSearchParams.get('priority') === 'true');
+  const [tagFilter, setTagFilter] = useState(urlSearchParams.get('tag') || '');
+  const [entityFilter, setEntityFilter] = useState(urlSearchParams.get('entity') || '');
+
+  const hasAnyFilter = keyword || source || sentiment || selectedScan || competitorOnly || priorityOnly || tagFilter || entityFilter;
+
+  function resetFilters() {
+    setKeyword('');
+    setSource('');
+    setSentiment('');
+    setSelectedScan('');
+    setCompetitorOnly(false);
+    setPriorityOnly(false);
+    setTagFilter('');
+    setEntityFilter('');
+    setPage(1);
+  }
 
   const loadResults = useCallback(async () => {
     setLoading(true);
-    const params = new URLSearchParams();
-    params.set('page', page.toString());
-    params.set('limit', '50');
-    if (keyword) params.set('keyword', keyword);
-    if (source) params.set('source', source);
-    if (sentiment) params.set('sentiment', sentiment);
-    if (selectedScan) params.set('scan_id', selectedScan);
-    if (competitorOnly) params.set('competitor', 'true');
-    if (priorityOnly) params.set('priority', 'true');
-    if (tagFilter) params.set('tag', tagFilter);
+    const qp = new URLSearchParams();
+    qp.set('page', page.toString());
+    qp.set('limit', '50');
+    if (keyword) qp.set('keyword', keyword);
+    if (source) qp.set('source', source);
+    if (sentiment) qp.set('sentiment', sentiment);
+    if (selectedScan) qp.set('scan_id', selectedScan);
+    if (competitorOnly) qp.set('competitor', 'true');
+    if (priorityOnly) qp.set('priority', 'true');
+    if (tagFilter) qp.set('tag', tagFilter);
+    if (entityFilter) qp.set('entity', entityFilter);
 
-    const res = await fetch(`/api/projects/${slug}/results?${params}`);
+    const res = await fetch(`/api/projects/${slug}/results?${qp}`);
     if (res.ok) {
       const data = await res.json();
       setResults(
@@ -56,36 +79,19 @@ export default function ResultsPage() {
         }))
       );
       setTotal(data.total);
-    }
-    setLoading(false);
-  }, [slug, page, keyword, source, sentiment, selectedScan, competitorOnly, priorityOnly, tagFilter]);
-
-  useEffect(() => {
-    loadResults();
-  }, [loadResults]);
-
-  useEffect(() => {
-    async function loadScans() {
-      const supabase = createClient();
-      const { data: project } = await supabase
-        .from('projects')
-        .select('id')
-        .eq('slug', slug)
-        .single();
-
-      if (project) {
-        const { data } = await supabase
-          .from('scans')
-          .select('id, completed_at')
-          .eq('project_id', project.id)
-          .eq('status', 'completed')
-          .order('completed_at', { ascending: false })
-          .limit(20);
-        setScans(data || []);
+      if (data.filter_options) {
+        setFilterOptions(data.filter_options);
       }
     }
-    loadScans();
-  }, [slug]);
+    setLoading(false);
+  }, [slug, page, keyword, source, sentiment, selectedScan, competitorOnly, priorityOnly, tagFilter, entityFilter]);
+
+  useEffect(() => {
+    if (!initializedRef.current) {
+      initializedRef.current = true;
+    }
+    loadResults();
+  }, [loadResults]);
 
   const totalPages = Math.ceil(total / 50);
 
@@ -117,9 +123,20 @@ export default function ResultsPage() {
       {/* Filters */}
       <Card className="border-0 shadow-md">
         <CardContent className="p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <Filter className="w-4 h-4 text-muted-foreground" />
-            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Filtri</span>
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Filter className="w-4 h-4 text-muted-foreground" />
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Filtri</span>
+            </div>
+            {hasAnyFilter && (
+              <button
+                onClick={resetFilters}
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors"
+              >
+                <RotateCcw className="h-3 w-3" />
+                Reset
+              </button>
+            )}
           </div>
           <div className="flex flex-wrap gap-3 items-end">
             <div>
@@ -130,9 +147,9 @@ export default function ResultsPage() {
                 className="w-[180px]"
               >
                 <option value="">Tutte le scan</option>
-                {scans.map((s) => (
+                {filterOptions.scans.map((s) => (
                   <option key={s.id} value={s.id}>
-                    {new Date(s.completed_at).toLocaleDateString('it-IT')}
+                    {new Date(s.completed_at).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' })}
                   </option>
                 ))}
               </Select>
@@ -140,12 +157,16 @@ export default function ResultsPage() {
 
             <div>
               <label className="block text-xs font-medium text-muted-foreground mb-1">Keyword</label>
-              <Input
+              <Select
                 value={keyword}
                 onChange={(e) => { setKeyword(e.target.value); setPage(1); }}
-                placeholder="Filtra..."
-                className="w-[150px]"
-              />
+                className="w-[180px]"
+              >
+                <option value="">Tutte</option>
+                {filterOptions.keywords.map((kw) => (
+                  <option key={kw} value={kw}>{kw}</option>
+                ))}
+              </Select>
             </div>
 
             <div>
@@ -179,10 +200,26 @@ export default function ResultsPage() {
             <div>
               <label className="block text-xs font-medium text-muted-foreground mb-1">Tag</label>
               <Input
+                list="tag-suggest"
                 value={tagFilter}
                 onChange={(e) => { setTagFilter(e.target.value); setPage(1); }}
                 placeholder="Filtra tag..."
-                className="w-[130px]"
+                className="w-[150px]"
+              />
+              <datalist id="tag-suggest">
+                {filterOptions.tags.map((t) => (
+                  <option key={t} value={t} />
+                ))}
+              </datalist>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-muted-foreground mb-1">Entita</label>
+              <Input
+                value={entityFilter}
+                onChange={(e) => { setEntityFilter(e.target.value); setPage(1); }}
+                placeholder="Filtra entita..."
+                className="w-[150px]"
               />
             </div>
 
@@ -243,7 +280,11 @@ export default function ResultsPage() {
                           #{result.position}
                         </span>
                         {analysis && (
-                          <Badge variant={analysis.sentiment as Sentiment}>
+                          <Badge
+                            variant={analysis.sentiment as Sentiment}
+                            className="cursor-pointer"
+                            onClick={() => { setSentiment(analysis.sentiment); setPage(1); }}
+                          >
                             {analysis.sentiment}
                           </Badge>
                         )}
@@ -289,7 +330,8 @@ export default function ResultsPage() {
                         {analysis?.entities?.map((e, i) => (
                           <span
                             key={i}
-                            className="text-xs bg-teal/10 text-teal rounded-full px-2 py-0.5"
+                            className="text-xs bg-teal/10 text-teal rounded-full px-2 py-0.5 cursor-pointer hover:bg-teal/20 transition-colors"
+                            onClick={() => { setEntityFilter(e.name); setPage(1); }}
                           >
                             {e.name}
                           </span>

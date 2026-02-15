@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { KPICards } from '@/components/dashboard/kpi-cards';
 import { AiBriefing } from '@/components/dashboard/ai-briefing';
 import { DomainBarChart } from '@/components/dashboard/domain-bar-chart';
@@ -56,6 +56,7 @@ function formatElapsed(startedAt: string | null): string {
 
 export default function ProjectDashboard() {
   const params = useParams();
+  const router = useRouter();
   const slug = params.slug as string;
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -344,14 +345,20 @@ export default function ProjectDashboard() {
       {/* 3. Top Domini (promoted) + 4. Sentiment */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <DomainBarChart data={data.top_domains} />
-        <SentimentChart data={data.sentiment_distribution} />
+        <SentimentChart
+          data={data.sentiment_distribution}
+          onSentimentClick={(s) => router.push(`/project/${slug}/results?sentiment=${s}`)}
+        />
       </div>
 
       {/* 5. Treemap Temi (full width) */}
-      <ThemeTreemap data={themes} />
+      <ThemeTreemap
+        data={themes}
+        onThemeClick={(t) => router.push(`/project/${slug}/results?tag=${encodeURIComponent(t)}`)}
+      />
 
-      {/* 6. Timeline (only if significant data) */}
-      {data.publication_timeline && data.publication_timeline.length > 1 && (
+      {/* 6. Articoli per Scan */}
+      {data.publication_timeline && data.publication_timeline.length > 0 && (
         <PublicationTimeline data={data.publication_timeline} />
       )}
     </div>

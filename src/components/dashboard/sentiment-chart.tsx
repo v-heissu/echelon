@@ -26,6 +26,7 @@ interface SentimentData {
 
 interface SentimentChartProps {
   data: SentimentData[];
+  onSentimentClick?: (sentiment: string) => void;
 }
 
 const SENTIMENT_COLORS: Record<string, string> = {
@@ -35,7 +36,18 @@ const SENTIMENT_COLORS: Record<string, string> = {
   negative: '#D64641',
 };
 
-function SentimentDonut({ data }: { data: SentimentData }) {
+const SENTIMENT_LABELS: Record<string, string> = {
+  positive: 'Positivo',
+  neutral: 'Neutro',
+  mixed: 'Misto',
+  negative: 'Negativo',
+  Positivo: 'positive',
+  Neutro: 'neutral',
+  Misto: 'mixed',
+  Negativo: 'negative',
+};
+
+function SentimentDonut({ data, onSentimentClick }: { data: SentimentData; onSentimentClick?: (s: string) => void }) {
   const total = data.positive + data.neutral + data.mixed + data.negative;
   if (total === 0) return <p className="text-sm text-muted-foreground text-center py-8">Nessun dato disponibile</p>;
 
@@ -59,6 +71,11 @@ function SentimentDonut({ data }: { data: SentimentData }) {
           nameKey="name"
           paddingAngle={2}
           label={({ name, percent }) => `${name || ''} ${((percent || 0) * 100).toFixed(0)}%`}
+          style={{ cursor: onSentimentClick ? 'pointer' : 'default' }}
+          onClick={(_: unknown, index: number) => {
+            const clicked = pieData[index];
+            if (clicked && onSentimentClick) onSentimentClick(clicked.key);
+          }}
         >
           {pieData.map((entry) => (
             <Cell key={entry.key} fill={SENTIMENT_COLORS[entry.key]} />
@@ -75,15 +92,19 @@ function SentimentDonut({ data }: { data: SentimentData }) {
           formatter={(value) => [Number(value), 'Conteggio']}
         />
         <Legend
-          wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }}
+          wrapperStyle={{ fontSize: '11px', paddingTop: '8px', cursor: onSentimentClick ? 'pointer' : 'default' }}
           formatter={(value: string) => value}
+          onClick={(e: { value?: string }) => {
+            const key = e.value ? SENTIMENT_LABELS[e.value] : undefined;
+            if (key && onSentimentClick) onSentimentClick(key);
+          }}
         />
       </PieChart>
     </ResponsiveContainer>
   );
 }
 
-function SentimentArea({ data }: { data: SentimentData[] }) {
+function SentimentArea({ data, onSentimentClick }: { data: SentimentData[]; onSentimentClick?: (s: string) => void }) {
   const chartData = data.map((d) => ({
     ...d,
     date: d.date ? new Date(d.date).toLocaleDateString('it-IT', { day: '2-digit', month: 'short' }) : '',
@@ -122,7 +143,13 @@ function SentimentArea({ data }: { data: SentimentData[] }) {
             padding: '12px',
           }}
         />
-        <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
+        <Legend
+          wrapperStyle={{ fontSize: '11px', paddingTop: '8px', cursor: onSentimentClick ? 'pointer' : 'default' }}
+          onClick={(e: { value?: string }) => {
+            const key = e.value ? SENTIMENT_LABELS[e.value] : undefined;
+            if (key && onSentimentClick) onSentimentClick(key);
+          }}
+        />
         <Area type="monotone" dataKey="positive" stackId="1" stroke="#2D6A4F" fill="url(#gradPositive)" strokeWidth={2} name="Positivo" />
         <Area type="monotone" dataKey="neutral" stackId="1" stroke="#008996" fill="url(#gradNeutral)" strokeWidth={2} name="Neutro" />
         <Area type="monotone" dataKey="mixed" stackId="1" stroke="#FFC76D" fill="url(#gradMixed)" strokeWidth={2} name="Misto" />
@@ -132,7 +159,7 @@ function SentimentArea({ data }: { data: SentimentData[] }) {
   );
 }
 
-export function SentimentChart({ data }: SentimentChartProps) {
+export function SentimentChart({ data, onSentimentClick }: SentimentChartProps) {
   const useDonut = data.length < 3;
 
   return (
@@ -145,9 +172,9 @@ export function SentimentChart({ data }: SentimentChartProps) {
           <h3 className="font-semibold text-primary text-[15px]">Distribuzione Sentiment</h3>
         </div>
         {useDonut && data.length > 0 ? (
-          <SentimentDonut data={data[data.length - 1]} />
+          <SentimentDonut data={data[data.length - 1]} onSentimentClick={onSentimentClick} />
         ) : data.length > 0 ? (
-          <SentimentArea data={data} />
+          <SentimentArea data={data} onSentimentClick={onSentimentClick} />
         ) : (
           <p className="text-sm text-muted-foreground text-center py-8">Nessun dato disponibile</p>
         )}
