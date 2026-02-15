@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { GeminiClient, TagGroupInput } from '@/lib/gemini/client';
+import { regenerateBriefing } from '@/lib/agents/briefing';
 
 export interface TagNormalizeResult {
   project_id: string;
@@ -238,6 +239,16 @@ export async function runTagNormalizer(projectId: string): Promise<TagNormalizeR
   console.log(
     `[tag-normalizer] Done for ${project.slug}: ${result.groups_found} groups, ${result.tags_merged} merged, ${result.tags_remaining} remaining`
   );
+
+  // 7. Regenerate AI briefing (themes changed, briefing may be stale)
+  if (result.tags_merged > 0) {
+    try {
+      await regenerateBriefing(projectId);
+      console.log(`[tag-normalizer] Briefing regenerated for ${project.slug}`);
+    } catch (briefingError) {
+      console.error(`[tag-normalizer] Briefing regeneration failed:`, briefingError);
+    }
+  }
 
   return result;
 }

@@ -337,7 +337,7 @@ export default function ProjectDashboard() {
       )}
 
       {/* 1. AI Briefing */}
-      <AiBriefing briefing={data.ai_briefing} scanCount={data.scan_count} />
+      <AiBriefing briefing={data.ai_briefing} scanCount={data.scan_count} slug={slug} />
 
       {/* 2. KPI Cards */}
       <KPICards

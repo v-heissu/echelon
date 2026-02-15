@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { GeminiClient, RelevanceInput } from '@/lib/gemini/client';
+import { regenerateBriefing } from '@/lib/agents/briefing';
 
 export interface ContextFilterResult {
   project_id: string;
@@ -148,6 +149,16 @@ export async function runContextFilter(
   console.log(
     `[context-filter] Done for ${project.slug}: ${result.total_evaluated} evaluated, ${result.marked_off_topic} off-topic, ${result.marked_on_topic} on-topic`
   );
+
+  // 7. Regenerate AI briefing (data changed, briefing may be stale)
+  if (result.total_evaluated > 0) {
+    try {
+      await regenerateBriefing(projectId);
+      console.log(`[context-filter] Briefing regenerated for ${project.slug}`);
+    } catch (briefingError) {
+      console.error(`[context-filter] Briefing regeneration failed:`, briefingError);
+    }
+  }
 
   return result;
 }
