@@ -239,37 +239,38 @@ export async function GET(
     }
   }
 
-  // Publication timeline: count articles by scan date (not fetched_at which can have stale dates like 2018)
-  const publicationTimeline: { date: string; count: number }[] = [];
+  // Publication timeline: one entry per scan (all completed scans, no limit)
+  const publicationTimeline: { date: string; count: number; scanId: string }[] = [];
   {
-    if (allScans && allScans.length > 0) {
-      const scanDateMap = new Map<string, string>();
-      allScans.forEach((s) => {
-        const scanDate = (s.started_at || s.completed_at || '').substring(0, 10);
-        if (scanDate) scanDateMap.set(s.id, scanDate);
-      });
+    const { data: timelineScans } = await admin
+      .from('scans')
+      .select('id, completed_at, started_at')
+      .eq('project_id', project.id)
+      .eq('status', 'completed')
+      .order('started_at', { ascending: true });
 
-      const projectScanIds = allScans.map((s) => s.id);
+    if (timelineScans && timelineScans.length > 0) {
+      const scanIds = timelineScans.map((s) => s.id);
       const { data: articleCounts } = await admin
         .from('serp_results')
         .select('scan_id')
-        .in('scan_id', projectScanIds);
+        .in('scan_id', scanIds);
 
       if (articleCounts && articleCounts.length > 0) {
-        const dateCounts = new Map<string, number>();
-        const twelveMonthsAgo = new Date();
-        twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
-
+        // Count articles per scan_id
+        const countsByScan = new Map<string, number>();
         articleCounts.forEach((r) => {
-          const day = scanDateMap.get(r.scan_id);
-          if (!day) return;
-          if (new Date(day) < twelveMonthsAgo) return;
-          dateCounts.set(day, (dateCounts.get(day) || 0) + 1);
+          countsByScan.set(r.scan_id, (countsByScan.get(r.scan_id) || 0) + 1);
         });
 
-        const sorted = Array.from(dateCounts.entries()).sort((a, b) => a[0].localeCompare(b[0]));
-        for (const [date, count] of sorted) {
-          publicationTimeline.push({ date, count });
+        for (const scan of timelineScans) {
+          const count = countsByScan.get(scan.id) || 0;
+          if (count === 0) continue;
+          publicationTimeline.push({
+            date: scan.completed_at || scan.started_at,
+            count,
+            scanId: scan.id,
+          });
         }
       }
     }
