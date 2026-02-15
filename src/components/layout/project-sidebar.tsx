@@ -1,10 +1,10 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
-import { EchelonLogo } from '@/components/ui/logo';
 import {
   LayoutDashboard,
   List,
@@ -47,21 +47,9 @@ export function ProjectSidebar({ slug, projectName, isAdmin }: ProjectSidebarPro
 
   return (
     <aside className="w-[264px] sidebar-mesh min-h-screen flex flex-col">
-      {/* Logo area */}
-      <div className="p-6 pb-5">
-        <div className="flex items-center gap-3">
-          <EchelonLogo size={40} />
-          <div className="min-w-0">
-            <h1 className="text-[15px] font-bold text-white tracking-wider">ECHELON</h1>
-            <p className="text-white/30 text-[10px] font-medium truncate mt-0.5">
-              {projectName}
-            </p>
-          </div>
-        </div>
-      </div>
-
+      {/* Top: admin link + nav */}
       {isAdmin && (
-        <div className="px-4 mb-2">
+        <div className="px-4 pt-5 mb-1">
           <Link
             href="/admin"
             className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs text-white/30 hover:bg-white/[0.06] hover:text-white/70 transition-all duration-200"
@@ -72,7 +60,7 @@ export function ProjectSidebar({ slug, projectName, isAdmin }: ProjectSidebarPro
         </div>
       )}
 
-      <div className="px-6 mb-4 mt-1">
+      <div className={cn('px-6 mb-4', isAdmin ? 'mt-1' : 'mt-6')}>
         <div className="h-px bg-gradient-to-r from-transparent via-white/[0.08] to-transparent" />
       </div>
 
@@ -109,8 +97,32 @@ export function ProjectSidebar({ slug, projectName, isAdmin }: ProjectSidebarPro
         </div>
       </nav>
 
+      {/* Bottom: brand + logout */}
       <div className="p-4 mt-auto">
-        <div className="h-px bg-gradient-to-r from-transparent via-white/[0.08] to-transparent mb-3" />
+        <div className="h-px bg-gradient-to-r from-transparent via-white/[0.08] to-transparent mb-4" />
+
+        {/* Brand block */}
+        <div className="flex items-center gap-3 px-2 mb-4">
+          <Image
+            src="/logo.png"
+            alt="Echelon"
+            width={44}
+            height={44}
+            className="rounded-xl shadow-lg shadow-black/30"
+          />
+          <div className="min-w-0">
+            <h1
+              className="text-[16px] font-bold text-white tracking-[0.12em]"
+              style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+            >
+              ECHELON
+            </h1>
+            <p className="text-white/30 text-[10px] font-medium truncate mt-0.5">
+              {projectName}
+            </p>
+          </div>
+        </div>
+
         <button
           onClick={handleLogout}
           className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] text-white/30 hover:bg-white/[0.06] hover:text-white/70 w-full transition-all duration-200"

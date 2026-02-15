@@ -146,7 +146,7 @@ export async function GET(
   // Sentiment distribution over time (include both completed and running scans with data)
   const { data: allScans } = await admin
     .from('scans')
-    .select('id, completed_at, started_at, status')
+    .select('id, completed_at, started_at, date_from, date_to, status')
     .eq('project_id', project.id)
     .in('status', ['completed', 'running'])
     .order('started_at', { ascending: true })
@@ -172,8 +172,10 @@ export async function GET(
         }
       });
 
+      // Use date_from (monitored period start) like publication timeline
+      // Fall back to date_to, then started_at
       sentimentTimeline.push({
-        date: scan.completed_at || scan.started_at,
+        date: scan.date_from || scan.date_to || scan.started_at,
         ...counts,
       });
     }
@@ -239,38 +241,45 @@ export async function GET(
     }
   }
 
-  // Publication timeline: count articles by scan date (not fetched_at which can have stale dates like 2018)
-  const publicationTimeline: { date: string; count: number }[] = [];
+  // Publication timeline: one entry per scan (all completed scans, no limit)
+  const publicationTimeline: { date: string; count: number; scanId: string }[] = [];
   {
-    if (allScans && allScans.length > 0) {
-      const scanDateMap = new Map<string, string>();
-      allScans.forEach((s) => {
-        const scanDate = (s.started_at || s.completed_at || '').substring(0, 10);
-        if (scanDate) scanDateMap.set(s.id, scanDate);
-      });
+    const { data: timelineScans } = await admin
+      .from('scans')
+      .select('id, completed_at, started_at, date_from, date_to')
+      .eq('project_id', project.id)
+      .eq('status', 'completed')
+      .order('started_at', { ascending: true });
 
-      const projectScanIds = allScans.map((s) => s.id);
+    if (timelineScans && timelineScans.length > 0) {
+      const scanIds = timelineScans.map((s) => s.id);
       const { data: articleCounts } = await admin
         .from('serp_results')
         .select('scan_id')
-        .in('scan_id', projectScanIds);
+        .in('scan_id', scanIds);
 
       if (articleCounts && articleCounts.length > 0) {
-        const dateCounts = new Map<string, number>();
-        const twelveMonthsAgo = new Date();
-        twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
-
+        // Count articles per scan_id
+        const countsByScan = new Map<string, number>();
         articleCounts.forEach((r) => {
-          const day = scanDateMap.get(r.scan_id);
-          if (!day) return;
-          if (new Date(day) < twelveMonthsAgo) return;
-          dateCounts.set(day, (dateCounts.get(day) || 0) + 1);
+          countsByScan.set(r.scan_id, (countsByScan.get(r.scan_id) || 0) + 1);
         });
 
-        const sorted = Array.from(dateCounts.entries()).sort((a, b) => a[0].localeCompare(b[0]));
-        for (const [date, count] of sorted) {
-          publicationTimeline.push({ date, count });
+        for (const scan of timelineScans) {
+          const count = countsByScan.get(scan.id) || 0;
+          if (count === 0) continue;
+          // Use date_from (the monitored period start) as the timeline date.
+          // For the first scan (date_from=null, covers "beginning of time" → date_to),
+          // fall back to date_to, then started_at.
+          publicationTimeline.push({
+            date: scan.date_from || scan.date_to || scan.started_at,
+            count,
+            scanId: scan.id,
+          });
         }
+
+        // Sort by displayed date (not started_at) so timeline is chronological
+        publicationTimeline.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
       }
     }
   }

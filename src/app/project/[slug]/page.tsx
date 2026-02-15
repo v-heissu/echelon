@@ -8,6 +8,7 @@ import { DomainBarChart } from '@/components/dashboard/domain-bar-chart';
 import { SentimentChart } from '@/components/dashboard/sentiment-chart';
 import { ThemeTreemap } from '@/components/dashboard/theme-treemap';
 import { PublicationTimeline } from '@/components/dashboard/publication-timeline';
+import { ExecutiveSummary } from '@/components/dashboard/executive-summary';
 import { BarChart3, Loader2, ChevronDown, ChevronUp, CheckCircle2, XCircle, Clock, Timer, AlertTriangle, Zap } from 'lucide-react';
 
 interface DashboardData {
@@ -339,14 +340,23 @@ export default function ProjectDashboard() {
       {/* 1. AI Briefing */}
       <AiBriefing briefing={data.ai_briefing} scanCount={data.scan_count} slug={slug} />
 
-      {/* 2. KPI Cards */}
+      {/* 2. Executive Summary */}
+      <ExecutiveSummary
+        kpi={data.kpi}
+        delta={data.delta}
+        themes={themes}
+        topDomains={data.top_domains}
+        scanCount={data.scan_count}
+      />
+
+      {/* 3. KPI Cards */}
       <KPICards
         kpi={data.kpi}
         delta={data.delta}
         onAlertClick={() => router.push(`/project/${slug}/results?priority=true`)}
       />
 
-      {/* 3. Top Domini (promoted) + 4. Sentiment */}
+      {/* 4. Top Domini + Sentiment */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <DomainBarChart data={data.top_domains} />
         <SentimentChart
@@ -355,13 +365,13 @@ export default function ProjectDashboard() {
         />
       </div>
 
-      {/* 5. Treemap Temi (full width) */}
+      {/* 5. Treemap Temi */}
       <ThemeTreemap
         data={themes}
         onThemeClick={(t) => router.push(`/project/${slug}/results?tag=${encodeURIComponent(t)}`)}
       />
 
-      {/* 6. Articoli per Scan */}
+      {/* 6. Timeline Articoli */}
       {data.publication_timeline && data.publication_timeline.length > 0 && (
         <PublicationTimeline data={data.publication_timeline} />
       )}

@@ -56,6 +56,8 @@ export async function regenerateBriefing(projectId: string): Promise<string | nu
 
   const prompt = `Sei un analista di intelligence competitiva. ${project.project_context ? 'Tieni conto del contesto e dello scopo del progetto per dare un briefing mirato e rilevante. ' : ''}Confronta questi dati SERP della scan corrente con la scan precedente. In 3-5 frasi in italiano: cosa è cambiato? Quali temi sono emersi o scomparsi? Quali competitor si sono mossi? Il sentiment è migliorato o peggiorato? Sii conciso e actionable.
 
+IMPORTANTE: Ignora i domini onnipresenti e generici (facebook.com, google.com, youtube.com, linkedin.com, twitter.com, x.com, instagram.com, wikipedia.org, reddit.com, amazon.com, tiktok.com, etc.). Concentrati solo sui domini rilevanti per il settore e il mercato del progetto, citando solo esempi da quella coorte o dai competitor indicati nella creazione del progetto.
+
 ${projectInfo}DATI:
 ${JSON.stringify({ current: currentStats, previous: previousStats }, null, 2)}
 
