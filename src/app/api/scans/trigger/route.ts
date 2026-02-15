@@ -12,7 +12,7 @@ export async function POST(request: Request) {
   const { data: profile } = await admin.from('users').select('role').eq('id', user.id).maybeSingle();
   if (!profile || profile.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
-  const { project_slug } = await request.json();
+  const { project_slug, scan_date } = await request.json();
 
   // Get project
   const { data: project, error: projectError } = await admin
@@ -32,9 +32,28 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'No keywords configured' }, { status: 400 });
   }
 
+  // Compute incremental date range
+  // date_to = scan_date provided by user (or now)
+  const dateTo = scan_date ? new Date(scan_date).toISOString() : new Date().toISOString();
+
+  // date_from = date_to of the last completed scan for this project (null if first scan)
+  const { data: lastScan } = await admin
+    .from('scans')
+    .select('date_to, completed_at')
+    .eq('project_id', project.id)
+    .eq('status', 'completed')
+    .order('completed_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  // If there's a previous scan with date_to set, use it as our date_from
+  // If previous scan exists but has no date_to (legacy scan), use its completed_at
+  // If no previous scan at all, date_from stays null (= from the beginning of time)
+  const dateFrom = lastScan?.date_to || lastScan?.completed_at || null;
+
   const totalTasks = keywords.length * sources.length;
 
-  // Create scan
+  // Create scan with date range
   const { data: scan, error: scanError } = await admin
     .from('scans')
     .insert({
@@ -44,6 +63,8 @@ export async function POST(request: Request) {
       started_at: new Date().toISOString(),
       total_tasks: totalTasks,
       completed_tasks: 0,
+      date_from: dateFrom,
+      date_to: dateTo,
     })
     .select()
     .single();
@@ -69,10 +90,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Failed to create jobs: ' + jobsError.message }, { status: 500 });
   }
 
-  // Return immediately — dashboard's processJobsLoop will pick up and process the jobs
   return NextResponse.json({
     scan_id: scan.id,
     total_tasks: totalTasks,
-    message: 'Scan avviata! Elaborazione server-side in corso.',
+    date_from: dateFrom,
+    date_to: dateTo,
+    message: dateFrom
+      ? `Scan incrementale: ${new Date(dateFrom).toLocaleDateString('it-IT')} → ${new Date(dateTo).toLocaleDateString('it-IT')}`
+      : `Prima scan: tutto fino al ${new Date(dateTo).toLocaleDateString('it-IT')}`,
   }, { status: 201 });
 }

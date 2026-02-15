@@ -46,7 +46,19 @@ export async function GET(request: Request) {
 
     if (!keywords.length || !sources.length) continue;
 
-    // Create scan
+    // Compute incremental date range
+    const dateTo = new Date().toISOString();
+    const { data: lastScan } = await supabase
+      .from('scans')
+      .select('date_to, completed_at')
+      .eq('project_id', project.id)
+      .eq('status', 'completed')
+      .order('completed_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const dateFrom = lastScan?.date_to || lastScan?.completed_at || null;
+
+    // Create scan with date range
     const totalTasks = keywords.length * sources.length;
     const { data: scan, error: scanError } = await supabase
       .from('scans')
@@ -57,6 +69,8 @@ export async function GET(request: Request) {
         started_at: new Date().toISOString(),
         total_tasks: totalTasks,
         completed_tasks: 0,
+        date_from: dateFrom,
+        date_to: dateTo,
       })
       .select()
       .single();
