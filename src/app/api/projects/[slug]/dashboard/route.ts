@@ -244,7 +244,7 @@ export async function GET(
   {
     const { data: timelineScans } = await admin
       .from('scans')
-      .select('id, completed_at, started_at')
+      .select('id, completed_at, started_at, date_from')
       .eq('project_id', project.id)
       .eq('status', 'completed')
       .order('started_at', { ascending: true });
@@ -266,8 +266,10 @@ export async function GET(
         for (const scan of timelineScans) {
           const count = countsByScan.get(scan.id) || 0;
           if (count === 0) continue;
+          // Use date_from (the monitored period) as the timeline date,
+          // falling back to started_at for the first scan (date_from = null)
           publicationTimeline.push({
-            date: scan.completed_at || scan.started_at,
+            date: scan.date_from || scan.started_at,
             count,
             scanId: scan.id,
           });
