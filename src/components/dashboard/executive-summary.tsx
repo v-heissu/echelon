@@ -1,7 +1,7 @@
 'use client';
 
 import { Card, CardContent } from '@/components/ui/card';
-import { FileText, TrendingUp, TrendingDown, Minus, Shield, AlertTriangle } from 'lucide-react';
+import { FileText, TrendingUp, TrendingDown, AlertTriangle } from 'lucide-react';
 
 interface KPIData {
   total_results: number;
@@ -32,24 +32,23 @@ interface ExecutiveSummaryProps {
   scanCount: number;
 }
 
-function sentimentLabel(score: number): { text: string; color: string; bg: string } {
-  if (score >= 0.5) return { text: 'molto positivo', color: 'text-positive', bg: 'bg-positive/10' };
-  if (score >= 0.15) return { text: 'positivo', color: 'text-positive', bg: 'bg-positive/10' };
-  if (score >= -0.15) return { text: 'neutro', color: 'text-muted-foreground', bg: 'bg-muted/50' };
-  if (score >= -0.5) return { text: 'negativo', color: 'text-destructive', bg: 'bg-destructive/10' };
-  return { text: 'molto negativo', color: 'text-destructive', bg: 'bg-destructive/10' };
+function sentimentLabel(score: number): { text: string; color: string } {
+  if (score >= 0.5) return { text: 'molto positivo', color: 'text-positive' };
+  if (score >= 0.15) return { text: 'positivo', color: 'text-positive' };
+  if (score >= -0.15) return { text: 'neutro', color: 'text-muted-foreground' };
+  if (score >= -0.5) return { text: 'negativo', color: 'text-destructive' };
+  return { text: 'molto negativo', color: 'text-destructive' };
 }
 
-function deltaIcon(value: number) {
-  if (value > 0) return <TrendingUp className="h-3.5 w-3.5 text-positive inline" />;
-  if (value < 0) return <TrendingDown className="h-3.5 w-3.5 text-destructive inline" />;
-  return <Minus className="h-3.5 w-3.5 text-muted-foreground inline" />;
-}
-
-function deltaText(value: number, isScore = false): string {
-  if (value === 0) return 'stabile';
-  if (isScore) return `${value > 0 ? '+' : ''}${value.toFixed(2)} rispetto alla scan precedente`;
-  return `${value > 0 ? '+' : ''}${value}% rispetto alla scan precedente`;
+function DeltaBadge({ value, label, invert }: { value: number; label: string; invert?: boolean }) {
+  if (value === 0) return null;
+  const positive = invert ? value < 0 : value > 0;
+  return (
+    <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-md ${positive ? 'bg-positive/10 text-positive' : 'bg-destructive/10 text-destructive'}`}>
+      {value > 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+      {label} {value > 0 ? '+' : ''}{value}%
+    </span>
+  );
 }
 
 export function ExecutiveSummary({ kpi, delta, themes, topDomains, scanCount }: ExecutiveSummaryProps) {
@@ -59,170 +58,98 @@ export function ExecutiveSummary({ kpi, delta, themes, topDomains, scanCount }: 
   const competitorDomains = topDomains.filter(d => d.is_competitor);
   const topThemes = themes.slice(0, 5);
   const negativeThemes = themes.filter(t => t.sentiment_score < -0.15).slice(0, 3);
-  const positiveThemes = themes.filter(t => t.sentiment_score > 0.15).slice(0, 3);
   const topOrganic = topDomains.filter(d => !d.is_competitor).slice(0, 3);
+  const hasDelta = scanCount >= 2;
 
   return (
     <Card className="border-0 shadow-sm rounded-2xl bg-white">
       <CardContent className="p-5">
-        {/* Header */}
         <div className="flex items-center gap-2.5 mb-4">
           <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-accent to-[#5B5FC7] flex items-center justify-center shadow-sm">
             <FileText className="w-4.5 h-4.5 text-white" />
           </div>
-          <div>
-            <h3 className="font-semibold text-primary text-[15px]">Executive Summary</h3>
-            <p className="text-[11px] text-muted-foreground">Sintesi testuale della scan corrente</p>
-          </div>
+          <h3 className="font-semibold text-primary text-[15px]">Executive Summary</h3>
         </div>
 
-        <div className="space-y-4">
-          {/* Overview */}
-          <div className="rounded-xl bg-[#f8f9fb] p-4">
-            <p className="text-sm text-primary/85 leading-relaxed">
-              La scan ha raccolto <span className="font-semibold text-primary">{kpi.total_results.toLocaleString('it-IT')} risultati</span> da{' '}
-              <span className="font-semibold text-primary">{kpi.unique_domains} domini unici</span>.{' '}
-              {kpi.competitor_mentions > 0 ? (
-                <>
-                  Tra questi, <span className="font-semibold text-orange">{kpi.competitor_mentions} menzioni competitor</span> rilevate.
-                </>
-              ) : (
-                <span className="text-muted-foreground">Nessuna menzione competitor rilevata.</span>
-              )}
-            </p>
-
-            {/* Deltas */}
-            {scanCount >= 2 && (delta.total_results !== 0 || delta.unique_domains !== 0) && (
-              <div className="flex flex-wrap gap-3 mt-3">
-                {delta.total_results !== 0 && (
-                  <span className={`inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-lg ${delta.total_results > 0 ? 'bg-positive/10 text-positive' : 'bg-destructive/10 text-destructive'}`}>
-                    {deltaIcon(delta.total_results)} Risultati: {delta.total_results > 0 ? '+' : ''}{delta.total_results}%
-                  </span>
-                )}
-                {delta.unique_domains !== 0 && (
-                  <span className={`inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-lg ${delta.unique_domains > 0 ? 'bg-positive/10 text-positive' : 'bg-destructive/10 text-destructive'}`}>
-                    {deltaIcon(delta.unique_domains)} Domini: {delta.unique_domains > 0 ? '+' : ''}{delta.unique_domains}%
-                  </span>
-                )}
-                {delta.competitor_mentions !== 0 && (
-                  <span className={`inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-lg ${delta.competitor_mentions > 0 ? 'bg-orange/10 text-orange' : 'bg-positive/10 text-positive'}`}>
-                    {deltaIcon(delta.competitor_mentions)} Competitor: {delta.competitor_mentions > 0 ? '+' : ''}{delta.competitor_mentions}%
-                  </span>
-                )}
-              </div>
+        <div className="text-sm text-primary/85 leading-relaxed space-y-2.5 rounded-xl bg-[#f8f9fb] p-4">
+          {/* Main paragraph */}
+          <p>
+            L&apos;ultima scan ha raccolto <span className="font-semibold text-primary">{kpi.total_results.toLocaleString('it-IT')} risultati</span> da{' '}
+            <span className="font-semibold text-primary">{kpi.unique_domains} domini unici</span>.{' '}
+            Il sentiment complessivo e <span className={`font-semibold ${sentiment.color}`}>{sentiment.text}</span>{' '}
+            (<span className={`font-semibold ${sentiment.color}`}>{kpi.avg_sentiment.toFixed(2)}</span>).
+            {kpi.competitor_mentions > 0 && (
+              <>{' '}Rilevate <span className="font-semibold text-orange">{kpi.competitor_mentions} menzioni competitor</span>.</>
             )}
-          </div>
+          </p>
 
-          {/* Sentiment */}
-          <div className="rounded-xl border border-border/50 p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <div className={`w-2.5 h-2.5 rounded-full ${kpi.avg_sentiment >= 0.15 ? 'bg-positive' : kpi.avg_sentiment <= -0.15 ? 'bg-destructive' : 'bg-muted-foreground'}`} />
-              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Sentiment</span>
-            </div>
-            <p className="text-sm text-primary/85 leading-relaxed">
-              Il sentiment medio e <span className={`font-semibold ${sentiment.color}`}>{sentiment.text}</span>{' '}
-              con un punteggio di <span className={`font-semibold px-1.5 py-0.5 rounded ${sentiment.bg} ${sentiment.color}`}>{kpi.avg_sentiment.toFixed(2)}</span>.{' '}
-              {scanCount >= 2 && delta.avg_sentiment !== 0 && (
-                <span className="text-muted-foreground">
-                  ({deltaIcon(delta.avg_sentiment)} {deltaText(delta.avg_sentiment, true)})
+          {/* Deltas inline */}
+          {hasDelta && (delta.total_results !== 0 || delta.unique_domains !== 0 || delta.avg_sentiment !== 0) && (
+            <div className="flex flex-wrap gap-2">
+              <DeltaBadge value={delta.total_results} label="Risultati" />
+              <DeltaBadge value={delta.unique_domains} label="Domini" />
+              <DeltaBadge value={delta.competitor_mentions} label="Competitor" />
+              {delta.avg_sentiment !== 0 && (
+                <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-md ${delta.avg_sentiment > 0 ? 'bg-positive/10 text-positive' : 'bg-destructive/10 text-destructive'}`}>
+                  {delta.avg_sentiment > 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                  Sentiment {delta.avg_sentiment > 0 ? '+' : ''}{delta.avg_sentiment.toFixed(2)}
                 </span>
-              )}
-            </p>
-          </div>
-
-          {/* Themes */}
-          {topThemes.length > 0 && (
-            <div className="rounded-xl border border-border/50 p-4">
-              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Temi principali</span>
-              <div className="flex flex-wrap gap-1.5 mt-2.5">
-                {topThemes.map(t => {
-                  const tSent = sentimentLabel(t.sentiment_score);
-                  return (
-                    <span
-                      key={t.name}
-                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium ${tSent.bg} ${tSent.color} border border-current/10`}
-                    >
-                      <span className={`w-1.5 h-1.5 rounded-full ${t.sentiment_score >= 0.15 ? 'bg-positive' : t.sentiment_score <= -0.15 ? 'bg-destructive' : 'bg-muted-foreground'}`} />
-                      {t.name}
-                      <span className="opacity-60">({t.count})</span>
-                    </span>
-                  );
-                })}
-              </div>
-
-              {/* Sentiment-specific theme insights */}
-              {(positiveThemes.length > 0 || negativeThemes.length > 0) && (
-                <div className="mt-3 space-y-1.5">
-                  {positiveThemes.length > 0 && (
-                    <p className="text-xs text-primary/70 leading-relaxed">
-                      <span className="text-positive font-medium">Temi positivi:</span>{' '}
-                      {positiveThemes.map(t => t.name).join(', ')}
-                    </p>
-                  )}
-                  {negativeThemes.length > 0 && (
-                    <p className="text-xs text-primary/70 leading-relaxed">
-                      <span className="text-destructive font-medium">Temi critici:</span>{' '}
-                      {negativeThemes.map(t => t.name).join(', ')}
-                    </p>
-                  )}
-                </div>
               )}
             </div>
           )}
 
-          {/* Competitor & Domain visibility */}
-          {(competitorDomains.length > 0 || topOrganic.length > 0) && (
-            <div className="rounded-xl border border-border/50 p-4">
-              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Visibilita domini</span>
+          {/* Themes + domains in one flow */}
+          {topThemes.length > 0 && (
+            <p>
+              I temi principali sono{' '}
+              {topThemes.map((t, i) => (
+                <span key={t.name}>
+                  {i > 0 && (i === topThemes.length - 1 ? ' e ' : ', ')}
+                  <span className={`font-medium ${t.sentiment_score >= 0.15 ? 'text-positive' : t.sentiment_score <= -0.15 ? 'text-destructive' : 'text-primary'}`}>
+                    {t.name}
+                  </span>
+                </span>
+              ))}.
+              {negativeThemes.length > 0 && (
+                <>{' '}Attenzione ai temi critici: <span className="font-medium text-destructive">{negativeThemes.map(t => t.name).join(', ')}</span>.</>
+              )}
+            </p>
+          )}
 
+          {(topOrganic.length > 0 || competitorDomains.length > 0) && (
+            <p>
               {topOrganic.length > 0 && (
-                <p className="text-sm text-primary/85 leading-relaxed mt-2">
-                  <Shield className="w-3.5 h-3.5 text-accent inline mr-1" />
-                  I domini piu visibili sono{' '}
+                <>
+                  I domini piu presenti sono{' '}
                   {topOrganic.map((d, i) => (
                     <span key={d.domain}>
                       {i > 0 && (i === topOrganic.length - 1 ? ' e ' : ', ')}
                       <span className="font-semibold text-accent">{d.domain}</span>
-                      <span className="text-muted-foreground text-xs"> ({d.count})</span>
                     </span>
-                  ))}.
-                </p>
+                  ))}.{' '}
+                </>
               )}
-
               {competitorDomains.length > 0 && (
-                <p className="text-sm text-primary/85 leading-relaxed mt-2">
-                  <AlertTriangle className="w-3.5 h-3.5 text-orange inline mr-1" />
-                  Competitor presenti:{' '}
+                <>
+                  Competitor rilevati:{' '}
                   {competitorDomains.map((d, i) => (
                     <span key={d.domain}>
                       {i > 0 && (i === competitorDomains.length - 1 ? ' e ' : ', ')}
                       <span className="font-semibold text-orange">{d.domain}</span>
-                      <span className="text-muted-foreground text-xs"> ({d.count} risultati)</span>
+                      <span className="text-muted-foreground text-xs"> ({d.count})</span>
                     </span>
                   ))}.
-                </p>
+                </>
               )}
-            </div>
+            </p>
           )}
 
-          {/* Alerts */}
+          {/* Alert inline */}
           {kpi.alert_count > 0 && (
-            <div className="rounded-xl bg-destructive/5 border border-destructive/15 p-4">
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 text-destructive" />
-                <span className="text-sm font-semibold text-destructive">
-                  {kpi.alert_count} {kpi.alert_count === 1 ? 'alert prioritario rilevato' : 'alert prioritari rilevati'}
-                </span>
-                {scanCount >= 2 && delta.alert_count !== 0 && (
-                  <span className={`text-xs font-medium px-2 py-0.5 rounded-md ${delta.alert_count > 0 ? 'bg-destructive/10 text-destructive' : 'bg-positive/10 text-positive'}`}>
-                    {delta.alert_count > 0 ? '+' : ''}{delta.alert_count}%
-                  </span>
-                )}
-              </div>
-              <p className="text-xs text-destructive/70 mt-1">
-                Risultati che corrispondono alle parole chiave di alert configurate per questo progetto.
-              </p>
-            </div>
+            <p className="text-destructive font-medium">
+              <AlertTriangle className="w-3.5 h-3.5 inline mr-1" />
+              {kpi.alert_count} alert {kpi.alert_count === 1 ? 'prioritario' : 'prioritari'} da verificare.
+            </p>
           )}
         </div>
       </CardContent>
