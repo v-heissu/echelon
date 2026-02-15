@@ -89,14 +89,23 @@ export default function ScansPage() {
   const slug = params.slug as string;
   const [scans, setScans] = useState<ScanData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
 
   async function loadScans() {
-    const res = await fetch(`/api/projects/${slug}/scans`);
-    if (res.ok) {
-      const data = await res.json();
-      setScans(data.scans || []);
+    try {
+      const res = await fetch(`/api/projects/${slug}/scans`);
+      if (res.ok) {
+        const data = await res.json();
+        setScans(data.scans || []);
+        setError(null);
+      } else {
+        const body = await res.json().catch(() => ({}));
+        setError(body.error || `Errore ${res.status}`);
+      }
+    } catch {
+      setError('Errore di rete');
     }
     setLoading(false);
   }
@@ -181,6 +190,9 @@ export default function ScansPage() {
             Storico delle scansioni del progetto
           </p>
         </div>
+        {error && (
+          <p className="text-sm text-destructive">{error}</p>
+        )}
         {selected.size > 0 && (
           <Button
             variant="destructive"
