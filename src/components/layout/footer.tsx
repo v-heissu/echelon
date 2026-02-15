@@ -4,7 +4,7 @@ export function Footer() {
       <div className="flex flex-col items-center gap-1.5">
         <div className="flex items-center gap-2.5">
           {/* Pro Web logo — will be replaced with uploaded image */}
-          <img src="/pwc-logo.png" alt="Pro Web Digital Consulting" className="h-6 w-auto" />
+          <img src="/pro_web_consulting_logo.png" alt="Pro Web Digital Consulting" className="h-6 w-auto" />
           <div className="leading-tight">
             <p className="text-[11px] font-semibold text-slate-400">
               Pro Web Digital Consulting
