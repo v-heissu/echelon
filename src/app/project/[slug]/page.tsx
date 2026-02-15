@@ -3,11 +3,12 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { KPICards } from '@/components/dashboard/kpi-cards';
-import { SentimentChart } from '@/components/dashboard/sentiment-chart';
+import { AiBriefing } from '@/components/dashboard/ai-briefing';
 import { DomainBarChart } from '@/components/dashboard/domain-bar-chart';
-import { ThemeBubbleChart } from '@/components/dashboard/theme-bubble-chart';
+import { SentimentChart } from '@/components/dashboard/sentiment-chart';
+import { ThemeTreemap } from '@/components/dashboard/theme-treemap';
 import { PublicationTimeline } from '@/components/dashboard/publication-timeline';
-import { BarChart3, Loader2, AlertTriangle, ChevronDown, ChevronUp, CheckCircle2, XCircle, Clock, Timer, Zap, RotateCcw } from 'lucide-react';
+import { BarChart3, Loader2, AlertTriangle, ChevronDown, ChevronUp, CheckCircle2, XCircle, Clock, Timer, Zap, AlertCircle } from 'lucide-react';
 
 interface DashboardData {
   kpi: { total_results: number; unique_domains: number; competitor_mentions: number; avg_sentiment: number };
@@ -18,6 +19,8 @@ interface DashboardData {
   publication_timeline: { date: string; count: number }[];
   scan_dates: string[];
   active_scan: { id: string; total_tasks: number; completed_tasks: number } | null;
+  ai_briefing: string | null;
+  scan_count: number;
 }
 
 interface ProcessResult {
@@ -71,7 +74,7 @@ export default function ProjectDashboard() {
   const [jobDetails, setJobDetails] = useState<ScanJob[]>([]);
   const [showJobDetails, setShowJobDetails] = useState(false);
   const [processedKeywords, setProcessedKeywords] = useState<{ keyword: string; source: string; status: 'ok' | 'error' }[]>([]);
-  const [resetting, setResetting] = useState(false);
+  const [pendingJobsBanner, setPendingJobsBanner] = useState<number>(0);
   const processingRef = useRef(false);
   const mountedRef = useRef(true);
   const scanIdRef = useRef<string | null>(null);
@@ -97,25 +100,27 @@ export default function ProjectDashboard() {
     }
   }, [slug]);
 
-  const resetAndRestart = useCallback(async () => {
-    setResetting(true);
+  // Check for pending jobs without active processing (scan paused banner)
+  const checkPendingBanner = useCallback(async () => {
+    if (processingRef.current) {
+      setPendingJobsBanner(0);
+      return;
+    }
     try {
-      const res = await fetch('/api/scans/reset', { method: 'POST' });
-      if (res.ok) {
-        const { reset_count } = await res.json();
-        console.log(`[reset] ${reset_count} job resettati`);
+      const dashRes = await fetch(`/api/projects/${slug}/dashboard`);
+      if (dashRes.ok) {
+        const dashData = await dashRes.json();
+        if (dashData.active_scan && !processingRef.current) {
+          const remaining = dashData.active_scan.total_tasks - dashData.active_scan.completed_tasks;
+          setPendingJobsBanner(remaining > 0 ? remaining : 0);
+        } else {
+          setPendingJobsBanner(0);
+        }
       }
-      processingRef.current = false;
-      setProcessingStatus(null);
-      setProcessingError(null);
-      setProcessedKeywords([]);
-      await loadData();
     } catch {
       // ignore
-    } finally {
-      if (mountedRef.current) setResetting(false);
     }
-  }, [loadData]);
+  }, [slug]);
 
   // Poll scan status (lightweight) for progress bar updates
   // Uses functional setState to avoid stale closure on `data`
@@ -215,6 +220,9 @@ export default function ProjectDashboard() {
       if (mountedRef.current && totalProcessed % POLL_EVERY_N_JOBS === 0) {
         pollScanStatus();
       }
+
+      // Rate limiting: 4s delay between jobs to avoid Gemini rate limits (15 RPM free tier)
+      await new Promise(resolve => setTimeout(resolve, 4000));
     }
 
     processingRef.current = false;
@@ -256,10 +264,15 @@ export default function ProjectDashboard() {
       }, 10000);
       return () => { clearInterval(statusInterval); clearInterval(dataInterval); };
     } else {
-      const interval = setInterval(loadData, 60000);
+      // Check for paused scan on idle
+      checkPendingBanner();
+      const interval = setInterval(() => {
+        loadData();
+        checkPendingBanner();
+      }, 60000);
       return () => clearInterval(interval);
     }
-  }, [loading, data?.active_scan, loadData, processJobsLoop, pollScanStatus]);
+  }, [loading, data?.active_scan, loadData, processJobsLoop, pollScanStatus, checkPendingBanner]);
 
   if (loading) {
     return (
@@ -321,19 +334,9 @@ export default function ProjectDashboard() {
                   <span className="text-sm font-semibold text-primary">
                     Scan in corso
                   </span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold text-accent tabular-nums">
-                      {activeScan ? `${activeScan.completed_tasks}/${activeScan.total_tasks}` : ''} ({scanProgress}%)
-                    </span>
-                    <button
-                      onClick={resetAndRestart}
-                      disabled={resetting}
-                      title="Reset worker bloccati e riavvia"
-                      className="p-1 rounded-lg hover:bg-[#f0f2f5] text-muted-foreground hover:text-primary transition-colors disabled:opacity-50"
-                    >
-                      <RotateCcw className={`h-3.5 w-3.5 ${resetting ? 'animate-spin' : ''}`} />
-                    </button>
-                  </div>
+                  <span className="text-sm font-bold text-accent tabular-nums">
+                    {activeScan ? `${activeScan.completed_tasks}/${activeScan.total_tasks}` : ''} ({scanProgress}%)
+                  </span>
                 </div>
                 {processingStatus && (
                   <p className="text-xs text-muted-foreground mt-0.5 truncate">{processingStatus}</p>
@@ -453,6 +456,21 @@ export default function ProjectDashboard() {
         </div>
       )}
 
+      {/* Scan paused banner: pending jobs but no active processing */}
+      {pendingJobsBanner > 0 && !processingRef.current && !processingStatus && (
+        <div className="rounded-2xl border border-gold/30 bg-gold/5 p-4 flex items-start gap-3">
+          <AlertCircle className="h-4 w-4 text-gold mt-0.5 shrink-0" />
+          <div>
+            <p className="text-sm font-medium text-primary">
+              Scan in pausa — {pendingJobsBanner} task in attesa
+            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Tieni questa pagina aperta per continuare l&apos;elaborazione.
+            </p>
+          </div>
+        </div>
+      )}
+
       {processingError && (
         <div className="rounded-2xl border border-red-200 bg-red-50 p-4 flex items-start gap-3">
           <AlertTriangle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
@@ -471,16 +489,23 @@ export default function ProjectDashboard() {
         </div>
       )}
 
+      {/* 1. AI Briefing */}
+      <AiBriefing briefing={data.ai_briefing} scanCount={data.scan_count} />
+
+      {/* 2. KPI Cards */}
       <KPICards kpi={data.kpi} delta={data.delta} />
 
+      {/* 3. Top Domini (promoted) + 4. Sentiment */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <SentimentChart data={data.sentiment_distribution} />
         <DomainBarChart data={data.top_domains} />
+        <SentimentChart data={data.sentiment_distribution} />
       </div>
 
-      <ThemeBubbleChart data={themes} />
+      {/* 5. Treemap Temi (full width) */}
+      <ThemeTreemap data={themes} />
 
-      {data.publication_timeline && data.publication_timeline.length > 0 && (
+      {/* 6. Timeline (only if significant data) */}
+      {data.publication_timeline && data.publication_timeline.length > 1 && (
         <PublicationTimeline data={data.publication_timeline} />
       )}
     </div>

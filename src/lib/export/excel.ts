@@ -19,15 +19,130 @@ interface CompetitorSummary {
   avg_sentiment: number;
 }
 
-export async function generateExcel(
-  results: SerpResultWithAnalysis[],
-  trends: TrendSummary[],
-  competitors: CompetitorSummary[],
-): Promise<Buffer> {
+interface ExportData {
+  results: SerpResultWithAnalysis[];
+  trends: TrendSummary[];
+  competitors: CompetitorSummary[];
+  kpi?: { total_results: number; unique_domains: number; competitor_mentions: number; avg_sentiment: number };
+  aiBriefing?: string | null;
+  projectCompetitors?: string[];
+  entities?: { name: string; type: string; count: number; avg_sentiment: number }[];
+}
+
+const HEADER_FILL: ExcelJS.Fill = {
+  type: 'pattern',
+  pattern: 'solid',
+  fgColor: { argb: 'FF001437' },
+};
+
+const HEADER_FONT: Partial<ExcelJS.Font> = {
+  color: { argb: 'FFFFFFFF' },
+  bold: true,
+  size: 11,
+};
+
+function applyHeaderStyle(sheet: ExcelJS.Worksheet): void {
+  sheet.getRow(1).font = HEADER_FONT;
+  sheet.getRow(1).fill = HEADER_FILL;
+}
+
+function setAutoFilter(sheet: ExcelJS.Worksheet, columnCount: number): void {
+  const lastColumnLetter = String.fromCharCode(64 + columnCount);
+  sheet.autoFilter = { from: 'A1', to: `${lastColumnLetter}1` };
+}
+
+export async function generateExcel(data: ExportData): Promise<Buffer> {
+  const {
+    results,
+    trends,
+    competitors,
+    kpi,
+    aiBriefing,
+    projectCompetitors,
+    entities,
+  } = data;
+
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'Echelon Web Monitor';
 
-  // Sheet 1: Results
+  // ---------------------------------------------------------------------------
+  // Sheet 1: Executive Summary
+  // ---------------------------------------------------------------------------
+  const summarySheet = workbook.addWorksheet('Executive Summary');
+  summarySheet.getColumn(1).width = 30;
+  summarySheet.getColumn(2).width = 50;
+
+  // Row 1 - Title
+  const titleRow = summarySheet.getRow(1);
+  titleRow.getCell(1).value = 'ECHELON - Executive Summary';
+  titleRow.getCell(1).font = { bold: true, size: 16 };
+
+  // Row 3 - KPI section header
+  const kpiHeaderRow = summarySheet.getRow(3);
+  kpiHeaderRow.getCell(1).value = 'KPI';
+  kpiHeaderRow.getCell(1).font = { bold: true, size: 12 };
+
+  // Rows 4-7 - KPI data
+  const kpiData = kpi || { total_results: results.length, unique_domains: 0, competitor_mentions: 0, avg_sentiment: 0 };
+  summarySheet.getRow(4).getCell(1).value = 'Risultati Totali';
+  summarySheet.getRow(4).getCell(2).value = kpiData.total_results;
+  summarySheet.getRow(5).getCell(1).value = 'Domini Unici';
+  summarySheet.getRow(5).getCell(2).value = kpiData.unique_domains;
+  summarySheet.getRow(6).getCell(1).value = 'Menzioni Competitor';
+  summarySheet.getRow(6).getCell(2).value = kpiData.competitor_mentions;
+  summarySheet.getRow(7).getCell(1).value = 'Sentiment Medio';
+  summarySheet.getRow(7).getCell(2).value = kpiData.avg_sentiment;
+
+  // Row 9 - AI Briefing section (only if available)
+  let nextSection = 9;
+  if (aiBriefing) {
+    const briefingHeaderRow = summarySheet.getRow(nextSection);
+    briefingHeaderRow.getCell(1).value = 'AI Briefing';
+    briefingHeaderRow.getCell(1).font = { bold: true, size: 12 };
+
+    const briefingRow = summarySheet.getRow(nextSection + 1);
+    briefingRow.getCell(1).value = aiBriefing;
+    briefingRow.getCell(1).alignment = { wrapText: true, vertical: 'top' };
+
+    nextSection = nextSection + 3; // skip to row 12
+  } else {
+    nextSection = 12;
+  }
+
+  // Top 5 Temi Emergenti section
+  const themesHeaderRow = summarySheet.getRow(nextSection);
+  themesHeaderRow.getCell(1).value = 'Top 5 Temi Emergenti';
+  themesHeaderRow.getCell(1).font = { bold: true, size: 12 };
+
+  const topThemes = [...trends]
+    .sort((a, b) => b.total_occurrences - a.total_occurrences)
+    .slice(0, 5);
+
+  topThemes.forEach((t, i) => {
+    const row = summarySheet.getRow(nextSection + 1 + i);
+    row.getCell(1).value = t.theme;
+    row.getCell(2).value = t.total_occurrences;
+  });
+
+  // Top 5 Competitor section
+  const compHeaderRowNum = nextSection + 7; // leave a gap row after themes
+  const compHeaderRow = summarySheet.getRow(compHeaderRowNum);
+  compHeaderRow.getCell(1).value = 'Top 5 Competitor';
+  compHeaderRow.getCell(1).font = { bold: true, size: 12 };
+
+  const topCompetitors = [...competitors]
+    .sort((a, b) => b.total_mentions - a.total_mentions)
+    .slice(0, 5);
+
+  topCompetitors.forEach((c, i) => {
+    const row = summarySheet.getRow(compHeaderRowNum + 1 + i);
+    row.getCell(1).value = c.domain;
+    row.getCell(2).value = c.total_mentions;
+  });
+
+  // ---------------------------------------------------------------------------
+  // Sheet 2: Risultati
+  // ---------------------------------------------------------------------------
   const resultsSheet = workbook.addWorksheet('Risultati');
   resultsSheet.columns = [
     { header: 'Data Scan', key: 'date', width: 15 },
@@ -47,12 +162,8 @@ export async function generateExcel(
     { header: 'Sommario AI', key: 'summary', width: 50 },
   ];
 
-  resultsSheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
-  resultsSheet.getRow(1).fill = {
-    type: 'pattern',
-    pattern: 'solid',
-    fgColor: { argb: 'FF001437' },
-  };
+  applyHeaderStyle(resultsSheet);
+  setAutoFilter(resultsSheet, 15);
 
   results.forEach((r) => {
     resultsSheet.addRow({
@@ -74,36 +185,9 @@ export async function generateExcel(
     });
   });
 
-  // Sheet 2: Trend Summary
-  const trendSheet = workbook.addWorksheet('Trend Summary');
-  trendSheet.columns = [
-    { header: 'Tema', key: 'theme', width: 25 },
-    { header: 'Occorrenze Totali', key: 'total', width: 18 },
-    { header: 'Sentiment Medio', key: 'avg_sentiment', width: 16 },
-    { header: 'Prima Apparizione', key: 'first_seen', width: 18 },
-    { header: 'Ultima Apparizione', key: 'last_seen', width: 18 },
-    { header: 'Trend', key: 'trend', width: 12 },
-  ];
-
-  trendSheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
-  trendSheet.getRow(1).fill = {
-    type: 'pattern',
-    pattern: 'solid',
-    fgColor: { argb: 'FF001437' },
-  };
-
-  trends.forEach((t) => {
-    trendSheet.addRow({
-      theme: t.theme,
-      total: t.total_occurrences,
-      avg_sentiment: t.avg_sentiment,
-      first_seen: t.first_seen,
-      last_seen: t.last_seen,
-      trend: t.trend_direction,
-    });
-  });
-
-  // Sheet 3: Competitor Analysis
+  // ---------------------------------------------------------------------------
+  // Sheet 3: Competitor Analysis (filtered by projectCompetitors)
+  // ---------------------------------------------------------------------------
   const compSheet = workbook.addWorksheet('Competitor Analysis');
   compSheet.columns = [
     { header: 'Dominio', key: 'domain', width: 25 },
@@ -114,14 +198,24 @@ export async function generateExcel(
     { header: 'Sentiment Medio', key: 'avg_sentiment', width: 16 },
   ];
 
-  compSheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
-  compSheet.getRow(1).fill = {
-    type: 'pattern',
-    pattern: 'solid',
-    fgColor: { argb: 'FF001437' },
-  };
+  applyHeaderStyle(compSheet);
+  setAutoFilter(compSheet, 6);
 
-  competitors.forEach((c) => {
+  // Filter competitors: use projectCompetitors if available, otherwise fall back to is_competitor flag
+  let filteredCompetitors: CompetitorSummary[];
+  if (projectCompetitors && projectCompetitors.length > 0) {
+    const competitorDomains = new Set(
+      projectCompetitors.map((c) => c.toLowerCase().replace(/^www\./, ''))
+    );
+    filteredCompetitors = competitors.filter((c) => {
+      const normalizedDomain = c.domain.toLowerCase().replace(/^www\./, '');
+      return competitorDomains.has(normalizedDomain);
+    });
+  } else {
+    filteredCompetitors = competitors;
+  }
+
+  filteredCompetitors.forEach((c) => {
     compSheet.addRow({
       domain: c.domain,
       mentions: c.total_mentions,
@@ -129,6 +223,58 @@ export async function generateExcel(
       avg_position: c.avg_position,
       themes: c.dominant_themes.join(', '),
       avg_sentiment: c.avg_sentiment,
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Sheet 4: Entita
+  // ---------------------------------------------------------------------------
+  const entitySheet = workbook.addWorksheet('Entità');
+  entitySheet.columns = [
+    { header: 'Nome', key: 'name', width: 30 },
+    { header: 'Tipo', key: 'type', width: 20 },
+    { header: 'Menzioni', key: 'count', width: 14 },
+    { header: 'Sentiment Medio', key: 'avg_sentiment', width: 16 },
+  ];
+
+  applyHeaderStyle(entitySheet);
+  setAutoFilter(entitySheet, 4);
+
+  if (entities && entities.length > 0) {
+    entities.forEach((e) => {
+      entitySheet.addRow({
+        name: e.name,
+        type: e.type,
+        count: e.count,
+        avg_sentiment: e.avg_sentiment,
+      });
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Sheet 5: Trend Summary (existing, kept as-is)
+  // ---------------------------------------------------------------------------
+  const trendSheet = workbook.addWorksheet('Trend Summary');
+  trendSheet.columns = [
+    { header: 'Tema', key: 'theme', width: 25 },
+    { header: 'Occorrenze Totali', key: 'total', width: 18 },
+    { header: 'Sentiment Medio', key: 'avg_sentiment', width: 16 },
+    { header: 'Prima Apparizione', key: 'first_seen', width: 18 },
+    { header: 'Ultima Apparizione', key: 'last_seen', width: 18 },
+    { header: 'Trend', key: 'trend', width: 12 },
+  ];
+
+  applyHeaderStyle(trendSheet);
+  setAutoFilter(trendSheet, 6);
+
+  trends.forEach((t) => {
+    trendSheet.addRow({
+      theme: t.theme,
+      total: t.total_occurrences,
+      avg_sentiment: t.avg_sentiment,
+      first_seen: t.first_seen,
+      last_seen: t.last_seen,
+      trend: t.trend_direction,
     });
   });
 

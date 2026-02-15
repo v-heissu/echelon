@@ -85,6 +85,25 @@ export async function GET(
     if (anyScan) fallbackScanId = anyScan.id;
   }
 
+  // Get total scan count for AI briefing messaging
+  const { count: scanCount } = await admin
+    .from('scans')
+    .select('id', { count: 'exact', head: true })
+    .eq('project_id', project.id)
+    .eq('status', 'completed');
+
+  // Get AI briefing from the latest completed scan
+  const { data: latestScanWithBriefing } = await admin
+    .from('scans')
+    .select('ai_briefing')
+    .eq('project_id', project.id)
+    .eq('status', 'completed')
+    .order('completed_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const aiBriefing: string | null = latestScanWithBriefing?.ai_briefing || null;
+
   const emptyResponse = {
     kpi: { total_results: 0, unique_domains: 0, competitor_mentions: 0, avg_sentiment: 0 },
     delta: { total_results: 0, unique_domains: 0, competitor_mentions: 0, avg_sentiment: 0 },
@@ -98,6 +117,8 @@ export async function GET(
       total_tasks: activeScan.total_tasks,
       completed_tasks: activeScan.completed_tasks,
     } : null,
+    ai_briefing: aiBriefing,
+    scan_count: scanCount || 0,
   };
 
   if ((!scans || scans.length === 0) && !fallbackScanId && !activeScan) {
@@ -218,22 +239,31 @@ export async function GET(
     }
   }
 
-  // Publication timeline: count articles by published date (fetched_at)
+  // Publication timeline: count articles by scan date (not fetched_at which can have stale dates like 2018)
   const publicationTimeline: { date: string; count: number }[] = [];
   {
-    // Get all scan IDs for this project
-    const projectScanIds = allScans?.map((s) => s.id) || [];
-    if (projectScanIds.length > 0) {
-      const { data: articleDates } = await admin
+    if (allScans && allScans.length > 0) {
+      const scanDateMap = new Map<string, string>();
+      allScans.forEach((s) => {
+        const scanDate = (s.started_at || s.completed_at || '').substring(0, 10);
+        if (scanDate) scanDateMap.set(s.id, scanDate);
+      });
+
+      const projectScanIds = allScans.map((s) => s.id);
+      const { data: articleCounts } = await admin
         .from('serp_results')
-        .select('fetched_at')
+        .select('scan_id')
         .in('scan_id', projectScanIds);
 
-      if (articleDates && articleDates.length > 0) {
+      if (articleCounts && articleCounts.length > 0) {
         const dateCounts = new Map<string, number>();
-        articleDates.forEach((r) => {
-          if (!r.fetched_at) return;
-          const day = r.fetched_at.substring(0, 10); // YYYY-MM-DD
+        const twelveMonthsAgo = new Date();
+        twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+
+        articleCounts.forEach((r) => {
+          const day = scanDateMap.get(r.scan_id);
+          if (!day) return;
+          if (new Date(day) < twelveMonthsAgo) return;
           dateCounts.set(day, (dateCounts.get(day) || 0) + 1);
         });
 
@@ -274,6 +304,8 @@ export async function GET(
       total_tasks: activeScan.total_tasks,
       completed_tasks: activeScan.completed_tasks,
     } : null,
+    ai_briefing: aiBriefing,
+    scan_count: scanCount || 0,
   });
 }
 

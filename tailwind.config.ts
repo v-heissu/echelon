@@ -34,7 +34,7 @@ const config: Config = {
           DEFAULT: "#DC2626",
           foreground: "#FFFFFF",
         },
-        positive: "#059669",
+        positive: "#2D6A4F",
         muted: {
           DEFAULT: "#f1f5f9",
           foreground: "#64748b",

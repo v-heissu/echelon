@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { processOneJob } from '@/lib/worker/process-jobs';
+
+export const maxDuration = 60;
 
 export async function GET(request: Request) {
   // Verify cron secret
@@ -74,18 +77,24 @@ export async function GET(request: Request) {
     triggeredProjects.push(project.slug);
   }
 
-  // Trigger worker if there are tasks
-  if (triggeredProjects.length > 0) {
-    const baseUrl = new URL(request.url).origin;
-    fetch(`${baseUrl}/api/worker`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ secret: process.env.WORKER_SECRET }),
-    }).catch(() => {});
+  // Process as many jobs as possible within the 55s budget
+  const startTime = Date.now();
+  const MAX_RUNTIME = 55000;
+  let processedCount = 0;
+
+  while (Date.now() - startTime < MAX_RUNTIME) {
+    const result = await processOneJob();
+    if (result.status === 'no_jobs') break;
+    if (result.status === 'processed') processedCount++;
+    if (result.pendingCount === 0) break;
+
+    // Rate limiting: 4s delay between Gemini calls
+    await new Promise(resolve => setTimeout(resolve, 4000));
   }
 
   return NextResponse.json({
-    message: `Triggered ${triggeredProjects.length} projects`,
+    message: `Triggered ${triggeredProjects.length} projects, processed ${processedCount} jobs`,
     projects: triggeredProjects,
+    processedCount,
   });
 }
