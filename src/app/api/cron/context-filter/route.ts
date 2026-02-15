@@ -16,7 +16,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const results = await runContextFilterAll(24);
+    const results = await runContextFilterAll();
 
     const summary = {
       projects_processed: results.length,

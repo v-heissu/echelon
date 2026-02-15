@@ -210,7 +210,7 @@ export async function runContextFilter(
  * Run context-filter for ALL active projects that haven't been filtered recently.
  * Used by the cron endpoint.
  */
-export async function runContextFilterAll(maxAgeHours = 24): Promise<ContextFilterResult[]> {
+export async function runContextFilterAll(): Promise<ContextFilterResult[]> {
   const supabase = createAdminClient();
 
   // For cron, just run for all active projects
