@@ -35,8 +35,8 @@ export function PublicationTimeline({ data }: PublicationTimelineProps) {
               <Calendar className="w-4.5 h-4.5 text-white" />
             </div>
             <div>
-              <h3 className="font-semibold text-primary text-[15px]">Timeline Pubblicazioni</h3>
-              <p className="text-[11px] text-muted-foreground">{totalArticles} articoli per data di pubblicazione</p>
+              <h3 className="font-semibold text-primary text-[15px]">Articoli per Scan</h3>
+              <p className="text-[11px] text-muted-foreground">{totalArticles} risultati totali</p>
             </div>
           </div>
         </div>

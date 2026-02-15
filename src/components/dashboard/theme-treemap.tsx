@@ -14,6 +14,7 @@ interface ThemeBubble {
 
 interface ThemeBubbleChartProps {
   data: ThemeBubble[];
+  onThemeClick?: (theme: string) => void;
 }
 
 function scoreToColor(sentiment: string, score: number): string {
@@ -32,65 +33,6 @@ interface TreemapContentProps {
   name?: string;
   count?: number;
   color?: string;
-}
-
-function CustomTreemapContent({ x, y, width, height, name, count, color }: TreemapContentProps) {
-  if (width < 4 || height < 4) return null;
-
-  const fontSize = Math.max(10, Math.min(14, width / 8));
-  const showCount = height > 30 && width > 40;
-
-  return (
-    <g>
-      <rect
-        x={x}
-        y={y}
-        width={width}
-        height={height}
-        rx={6}
-        ry={6}
-        style={{
-          fill: color || '#33A1AB',
-          stroke: '#fff',
-          strokeWidth: 2,
-          cursor: 'pointer',
-          opacity: 0.9,
-        }}
-      />
-      {width > 30 && height > 20 && (
-        <text
-          x={x + width / 2}
-          y={y + height / 2 + (showCount ? -6 : 0)}
-          textAnchor="middle"
-          dominantBaseline="central"
-          style={{
-            fontSize,
-            fill: '#fff',
-            fontWeight: 600,
-            pointerEvents: 'none',
-          }}
-        >
-          {name && name.length > width / 8 ? name.slice(0, Math.floor(width / 8)) + '…' : name}
-        </text>
-      )}
-      {showCount && (
-        <text
-          x={x + width / 2}
-          y={y + height / 2 + fontSize - 2}
-          textAnchor="middle"
-          dominantBaseline="central"
-          style={{
-            fontSize: fontSize - 2,
-            fill: 'rgba(255,255,255,0.85)',
-            fontWeight: 400,
-            pointerEvents: 'none',
-          }}
-        >
-          {count}
-        </text>
-      )}
-    </g>
-  );
 }
 
 interface TooltipPayloadEntry {
@@ -132,7 +74,69 @@ function CustomTooltip({ active, payload }: { active?: boolean; payload?: Toolti
   );
 }
 
-export function ThemeTreemap({ data }: ThemeBubbleChartProps) {
+export function ThemeTreemap({ data, onThemeClick }: ThemeBubbleChartProps) {
+  // Define treemap content inside to capture onThemeClick via closure
+  function TreemapContent({ x, y, width, height, name, count, color }: TreemapContentProps) {
+    if (width < 4 || height < 4) return null;
+
+    const fontSize = Math.max(10, Math.min(14, width / 8));
+    const showCount = height > 30 && width > 40;
+
+    return (
+      <g
+        onClick={() => name && onThemeClick?.(name)}
+        style={{ cursor: onThemeClick ? 'pointer' : 'default' }}
+      >
+        <rect
+          x={x}
+          y={y}
+          width={width}
+          height={height}
+          rx={6}
+          ry={6}
+          style={{
+            fill: color || '#33A1AB',
+            stroke: '#fff',
+            strokeWidth: 2,
+            opacity: 0.9,
+          }}
+        />
+        {width > 30 && height > 20 && (
+          <text
+            x={x + width / 2}
+            y={y + height / 2 + (showCount ? -6 : 0)}
+            textAnchor="middle"
+            dominantBaseline="central"
+            style={{
+              fontSize,
+              fill: '#fff',
+              fontWeight: 600,
+              pointerEvents: 'none',
+            }}
+          >
+            {name && name.length > width / 8 ? name.slice(0, Math.floor(width / 8)) + '\u2026' : name}
+          </text>
+        )}
+        {showCount && (
+          <text
+            x={x + width / 2}
+            y={y + height / 2 + fontSize - 2}
+            textAnchor="middle"
+            dominantBaseline="central"
+            style={{
+              fontSize: fontSize - 2,
+              fill: 'rgba(255,255,255,0.85)',
+              fontWeight: 400,
+              pointerEvents: 'none',
+            }}
+          >
+            {count}
+          </text>
+        )}
+      </g>
+    );
+  }
+
   if (data.length === 0) {
     return (
       <Card className="border-0 shadow-sm rounded-2xl bg-white">
@@ -180,7 +184,7 @@ export function ThemeTreemap({ data }: ThemeBubbleChartProps) {
             data={treemapData}
             dataKey="size"
             nameKey="name"
-            content={<CustomTreemapContent x={0} y={0} width={0} height={0} />}
+            content={<TreemapContent x={0} y={0} width={0} height={0} />}
           >
             <Tooltip content={<CustomTooltip />} />
           </Treemap>
