@@ -146,7 +146,7 @@ export async function GET(
   // Sentiment distribution over time (include both completed and running scans with data)
   const { data: allScans } = await admin
     .from('scans')
-    .select('id, completed_at, started_at, status')
+    .select('id, completed_at, started_at, date_from, date_to, status')
     .eq('project_id', project.id)
     .in('status', ['completed', 'running'])
     .order('started_at', { ascending: true })
@@ -172,8 +172,10 @@ export async function GET(
         }
       });
 
+      // Use date_from (monitored period start) like publication timeline
+      // Fall back to date_to, then started_at
       sentimentTimeline.push({
-        date: scan.completed_at || scan.started_at,
+        date: scan.date_from || scan.date_to || scan.started_at,
         ...counts,
       });
     }
