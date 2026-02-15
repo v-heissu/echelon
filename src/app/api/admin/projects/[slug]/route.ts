@@ -60,18 +60,19 @@ export async function PUT(
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // Update alert_keywords separately to isolate potential JSONB issues
+  // Use RPC function to bypass PostgREST schema cache for alert_keywords
   if (body.alert_keywords !== undefined) {
     const alertKw = Array.isArray(body.alert_keywords) ? body.alert_keywords.slice(0, 15) : [];
-    console.log('[PUT] Saving alert_keywords for', params.slug, ':', JSON.stringify(alertKw));
-    const { error: akError } = await admin
-      .from('projects')
-      .update({ alert_keywords: alertKw })
-      .eq('slug', params.slug);
+    console.log('[PUT] Saving alert_keywords via RPC for', params.slug, ':', JSON.stringify(alertKw));
+    const { data: rpcResult, error: akError } = await admin.rpc('set_project_alert_keywords', {
+      p_slug: params.slug,
+      p_keywords: alertKw,
+    });
     if (akError) {
-      console.error('[PUT] alert_keywords update failed:', akError.message);
+      console.error('[PUT] alert_keywords RPC failed:', akError.message);
       return NextResponse.json({ error: 'alert_keywords: ' + akError.message }, { status: 500 });
     }
+    console.log('[PUT] RPC result:', JSON.stringify(rpcResult));
     project.alert_keywords = alertKw;
   }
 
