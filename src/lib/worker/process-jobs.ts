@@ -15,7 +15,7 @@ export interface ProcessResult {
 
 /**
  * Process ONE job from the queue and return the result.
- * Browser-driven as primary method: the frontend calls this repeatedly.
+ * Server-only: called by /api/scans/trigger and /api/cron/scheduler inline loops.
  * Includes stale job detection to auto-recover from stuck processing states.
  */
 export async function processOneJob(): Promise<ProcessResult> {
@@ -197,7 +197,7 @@ export async function processOneJob(): Promise<ProcessResult> {
         }
 
         if (scan.project_id) {
-          await updateTags(supabase, scan.project_id, analysis.results);
+          await updateTags(supabase, scan.project_id, job.scan_id, analysis.results);
         }
       } catch (aiError) {
         console.error('AI analysis failed, continuing without:', aiError);
@@ -285,6 +285,7 @@ function normalizeTagSlug(name: string): string {
 async function updateTags(
   supabase: ReturnType<typeof createAdminClient>,
   projectId: string,
+  scanId: string,
   results: { themes: { name: string; confidence: number }[]; sentiment?: string; sentiment_score?: number }[]
 ) {
   const themeMap = new Map<string, { count: number; sentimentSum: number; sentimentCount: number }>();
@@ -317,8 +318,7 @@ async function updateTags(
     const slug = normalizeTagSlug(name);
     if (!slug) continue;
 
-    // Try upsert first (requires unique constraint from migration 004)
-    // Fallback to lookup+update/insert if upsert fails
+    // Lookup or create the tag
     const { data: existing, error: lookupError } = await supabase
       .from('tags')
       .select('id, count')
@@ -331,7 +331,10 @@ async function updateTags(
       continue;
     }
 
+    let tagId: string | null = null;
+
     if (existing) {
+      tagId = existing.id;
       const { error: updateError } = await supabase
         .from('tags')
         .update({
@@ -343,30 +346,63 @@ async function updateTags(
         console.error('[updateTags] Update error for', name, ':', updateError.message);
       }
     } else {
-      const { error: insertError } = await supabase.from('tags').insert({
+      const { data: inserted, error: insertError } = await supabase.from('tags').insert({
         project_id: projectId,
         name,
         slug,
         count: data.count,
         last_seen_at: new Date().toISOString(),
-      });
+      }).select('id').single();
+
       if (insertError) {
-        // Handle duplicate key race condition: another worker inserted the same tag
         if (insertError.code === '23505') {
-          // Unique constraint violation - try to update instead
-          const { error: retryUpdateError } = await supabase
+          // Unique constraint violation - race condition, fetch the existing tag
+          const { data: raced } = await supabase
             .from('tags')
-            .update({
-              count: data.count,
-              last_seen_at: new Date().toISOString(),
-            })
+            .select('id, count')
             .eq('project_id', projectId)
-            .eq('slug', slug);
-          if (retryUpdateError) {
-            console.error('[updateTags] Retry update error for', name, ':', retryUpdateError.message);
+            .eq('slug', slug)
+            .maybeSingle();
+          if (raced) {
+            tagId = raced.id;
+            await supabase
+              .from('tags')
+              .update({
+                count: raced.count + data.count,
+                last_seen_at: new Date().toISOString(),
+              })
+              .eq('id', raced.id);
           }
         } else {
           console.error('[updateTags] Insert error for', name, ':', insertError.message);
+        }
+      } else if (inserted) {
+        tagId = inserted.id;
+      }
+    }
+
+    // Upsert tag_scans record for sparkline data
+    if (tagId) {
+      const { data: existingTs } = await supabase
+        .from('tag_scans')
+        .select('id, count')
+        .eq('tag_id', tagId)
+        .eq('scan_id', scanId)
+        .maybeSingle();
+
+      if (existingTs) {
+        await supabase
+          .from('tag_scans')
+          .update({ count: existingTs.count + data.count })
+          .eq('id', existingTs.id);
+      } else {
+        const { error: tsError } = await supabase.from('tag_scans').insert({
+          tag_id: tagId,
+          scan_id: scanId,
+          count: data.count,
+        });
+        if (tsError && tsError.code !== '23505') {
+          console.error('[updateTags] tag_scans insert error for', name, ':', tsError.message);
         }
       }
     }

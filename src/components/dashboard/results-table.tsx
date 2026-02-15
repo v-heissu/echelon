@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ChevronDown, ChevronUp, ExternalLink, Sparkles } from 'lucide-react';
+import { ChevronDown, ChevronUp, ExternalLink, Sparkles, AlertTriangle } from 'lucide-react';
 import { SerpResultWithAnalysis, Sentiment } from '@/types/database';
 import { truncate } from '@/lib/utils';
 
@@ -85,7 +85,16 @@ export function ResultsTable({ results, onTagClick }: ResultsTableProps) {
                   key={result.id}
                   className={`hover:bg-muted/30 transition-colors ${result.is_competitor ? 'border-l-4 border-l-orange' : ''}`}
                 >
-                  <TableCell className="font-mono text-sm text-muted-foreground">{result.position}</TableCell>
+                  <TableCell className="font-mono text-sm text-muted-foreground">
+                    <div className="flex items-center gap-1">
+                      {result.position}
+                      {analysis?.is_hi_priority && (
+                        <span title={analysis.priority_reason || 'Alta priorità'}>
+                          <AlertTriangle className="h-3.5 w-3.5 text-destructive" />
+                        </span>
+                      )}
+                    </div>
+                  </TableCell>
                   <TableCell>
                     <a
                       href={result.url}
@@ -199,6 +208,12 @@ export function ResultsTable({ results, onTagClick }: ResultsTableProps) {
                         <div className="flex gap-4 text-xs text-muted-foreground pt-1 border-t border-border/50">
                           <span>Score: <strong>{analysis?.sentiment_score?.toFixed(2) || '—'}</strong></span>
                           <span>Lingua: <strong>{analysis?.language_detected || '—'}</strong></span>
+                          {analysis?.is_hi_priority && (
+                            <span className="text-destructive flex items-center gap-1">
+                              <AlertTriangle className="h-3 w-3" />
+                              <strong>Alert:</strong> {analysis.priority_reason || 'Alta priorità'}
+                            </span>
+                          )}
                         </div>
                       </div>
                     </TableCell>

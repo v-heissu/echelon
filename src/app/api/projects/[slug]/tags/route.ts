@@ -3,7 +3,7 @@ import { createServerSupabase } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: { slug: string } }
 ) {
   const supabase = createServerSupabase();
@@ -11,6 +11,8 @@ export async function GET(
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const admin = createAdminClient();
+  const { searchParams } = new URL(request.url);
+  const scanId = searchParams.get('scan_id');
 
   const { data: project } = await admin
     .from('projects')
@@ -20,21 +22,93 @@ export async function GET(
 
   if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 });
 
-  const { data: tags, error } = await admin
-    .from('tags')
-    .select('*')
+  // Get completed scans for the filter dropdown
+  const { data: scans } = await admin
+    .from('scans')
+    .select('id, completed_at, started_at')
     .eq('project_id', project.id)
-    .order('count', { ascending: false });
+    .eq('status', 'completed')
+    .order('completed_at', { ascending: false })
+    .limit(20);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  // Get tags with optional scan filter
+  let tags;
+  if (scanId) {
+    // When filtering by scan, get tags that have tag_scans entries for this scan
+    const { data: tagScans } = await admin
+      .from('tag_scans')
+      .select('tag_id, count, tags!inner(id, project_id, name, slug, count, last_seen_at)')
+      .eq('scan_id', scanId)
+      .eq('tags.project_id', project.id)
+      .order('count', { ascending: false });
 
-  // If tags table is empty, rebuild from ai_analysis data
-  if (!tags || tags.length === 0) {
-    const rebuilt = await rebuildTagsFromAnalysis(admin, project.id);
-    return NextResponse.json(rebuilt);
+    tags = (tagScans || []).map((ts) => {
+      const tag = Array.isArray(ts.tags) ? ts.tags[0] : ts.tags;
+      return {
+        ...tag,
+        scan_count: ts.count,
+      };
+    });
+  } else {
+    const { data, error } = await admin
+      .from('tags')
+      .select('*')
+      .eq('project_id', project.id)
+      .order('count', { ascending: false });
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+    // If tags table is empty, rebuild from ai_analysis data
+    if (!data || data.length === 0) {
+      const rebuilt = await rebuildTagsFromAnalysis(admin, project.id);
+      return NextResponse.json({
+        tags: rebuilt,
+        scans: scans || [],
+        sparklines: {},
+      });
+    }
+    tags = data;
   }
 
-  return NextResponse.json(tags);
+  // Get sparkline data: tag_scans for all tags in this project across last N scans
+  const sparklines: Record<string, { scan_id: string; count: number; date: string }[]> = {};
+  const scanIds = (scans || []).map((s) => s.id);
+
+  if (tags && tags.length > 0 && scanIds.length > 0) {
+    const tagIds = tags.map((t: { id: string }) => t.id);
+    const { data: allTagScans } = await admin
+      .from('tag_scans')
+      .select('tag_id, scan_id, count')
+      .in('tag_id', tagIds)
+      .in('scan_id', scanIds);
+
+    // Build a scan_id -> date map
+    const scanDateMap = new Map<string, string>();
+    (scans || []).forEach((s) => {
+      scanDateMap.set(s.id, s.completed_at || s.started_at);
+    });
+
+    if (allTagScans) {
+      for (const ts of allTagScans) {
+        if (!sparklines[ts.tag_id]) sparklines[ts.tag_id] = [];
+        sparklines[ts.tag_id].push({
+          scan_id: ts.scan_id,
+          count: ts.count,
+          date: scanDateMap.get(ts.scan_id) || '',
+        });
+      }
+      // Sort each sparkline by date ascending
+      for (const tagId of Object.keys(sparklines)) {
+        sparklines[tagId].sort((a, b) => a.date.localeCompare(b.date));
+      }
+    }
+  }
+
+  return NextResponse.json({
+    tags: tags || [],
+    scans: scans || [],
+    sparklines,
+  });
 }
 
 export async function POST(
