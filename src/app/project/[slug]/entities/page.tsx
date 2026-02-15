@@ -311,7 +311,7 @@ export default function EntitiesPage() {
                     className="cursor-pointer hover:bg-muted/30 transition-colors"
                     onClick={() =>
                       router.push(
-                        `/project/${slug}/entities/${encodeURIComponent(entity.name)}`
+                        `/project/${slug}/entities/${encodeURIComponent(entity.name)}?type=${activeTab}`
                       )
                     }
                   >

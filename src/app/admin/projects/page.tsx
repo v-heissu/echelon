@@ -103,6 +103,7 @@ export default function ProjectsPage() {
       const firstRes = await fetch(`/api/projects/${slug}/filter`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
       });
       if (!firstRes.ok) {
         const data = await firstRes.json();
@@ -114,7 +115,7 @@ export default function ProjectsPage() {
       totalOffTopic += batch.marked_off_topic;
       totalDeleted += batch.deleted || 0;
 
-      // Loop until done
+      // Loop until done, passing cursor to avoid re-processing
       while (batch.status === 'processing') {
         setFilterProgress(`Filtro in corso... ${totalEvaluated} valutati, ${totalDeleted} eliminati, ${batch.remaining} rimanenti`);
 
@@ -124,6 +125,7 @@ export default function ProjectsPage() {
         const res = await fetch(`/api/projects/${slug}/filter`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cursor: batch.cursor }),
         });
         if (!res.ok) {
           const data = await res.json();
