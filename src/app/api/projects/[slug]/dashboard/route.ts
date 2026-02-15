@@ -244,7 +244,7 @@ export async function GET(
   {
     const { data: timelineScans } = await admin
       .from('scans')
-      .select('id, completed_at, started_at, date_from')
+      .select('id, completed_at, started_at, date_from, date_to')
       .eq('project_id', project.id)
       .eq('status', 'completed')
       .order('started_at', { ascending: true });
@@ -266,14 +266,18 @@ export async function GET(
         for (const scan of timelineScans) {
           const count = countsByScan.get(scan.id) || 0;
           if (count === 0) continue;
-          // Use date_from (the monitored period) as the timeline date,
-          // falling back to started_at for the first scan (date_from = null)
+          // Use date_from (the monitored period start) as the timeline date.
+          // For the first scan (date_from=null, covers "beginning of time" → date_to),
+          // fall back to date_to, then started_at.
           publicationTimeline.push({
-            date: scan.date_from || scan.started_at,
+            date: scan.date_from || scan.date_to || scan.started_at,
             count,
             scanId: scan.id,
           });
         }
+
+        // Sort by displayed date (not started_at) so timeline is chronological
+        publicationTimeline.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
       }
     }
   }
