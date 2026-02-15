@@ -31,8 +31,6 @@ interface ScanData {
   completed_at: string | null;
   total_tasks: number;
   completed_tasks: number;
-  date_from: string | null;
-  date_to: string | null;
   result_count: number;
 }
 
