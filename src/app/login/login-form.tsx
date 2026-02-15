@@ -6,7 +6,6 @@ import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Loader2 } from 'lucide-react';
-import { EchelonLogo } from '@/components/ui/logo';
 
 export default function LoginForm() {
   const searchParams = useSearchParams();
@@ -45,7 +44,7 @@ export default function LoginForm() {
     <div className="w-full max-w-[420px] animate-fade-in-up">
       <div className="text-center mb-10">
         <div className="inline-flex items-center justify-center mb-5 animate-float">
-          <EchelonLogo size={80} />
+          <img src="/logo.png" alt="Echelon" width={80} height={80} className="rounded-2xl" />
         </div>
         <h1 className="text-3xl font-extrabold text-white tracking-tight">
           ECHELON
