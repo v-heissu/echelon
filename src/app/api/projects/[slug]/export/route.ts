@@ -127,7 +127,78 @@ export async function GET(
       : 0,
   }));
 
-  const buffer = await generateExcel(mappedResults, trends, competitorSummaries);
+  // Compute KPI data inline
+  const uniqueDomains = new Set(mappedResults.map((r) => r.domain)).size;
+  const competitorMentions = mappedResults.filter((r) => r.is_competitor).length;
+  let sentimentSum = 0;
+  let sentimentCount = 0;
+  mappedResults.forEach((r) => {
+    if (r.ai_analysis?.sentiment_score != null) {
+      sentimentSum += r.ai_analysis.sentiment_score;
+      sentimentCount++;
+    }
+  });
+  const kpi = {
+    total_results: mappedResults.length,
+    unique_domains: uniqueDomains,
+    competitor_mentions: competitorMentions,
+    avg_sentiment: sentimentCount > 0 ? Number((sentimentSum / sentimentCount).toFixed(2)) : 0,
+  };
+
+  // Fetch AI briefing from latest completed scan
+  const { data: latestScanWithBriefing } = await admin
+    .from('scans')
+    .select('ai_briefing')
+    .eq('project_id', project.id)
+    .eq('status', 'completed')
+    .order('completed_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const aiBriefing: string | null = latestScanWithBriefing?.ai_briefing || null;
+
+  // Extract and aggregate entities from ai_analysis data
+  const entityMap = new Map<string, { type: string; count: number; sentimentSum: number; sentimentCount: number }>();
+  mappedResults.forEach((r) => {
+    const analysis = r.ai_analysis;
+    if (!analysis?.entities) return;
+    (analysis.entities as { name: string; type: string }[]).forEach((e) => {
+      const key = e.name.toLowerCase().trim();
+      const existing = entityMap.get(key) || {
+        type: e.type || 'unknown',
+        count: 0,
+        sentimentSum: 0,
+        sentimentCount: 0,
+      };
+      existing.count++;
+      if (analysis.sentiment_score != null) {
+        existing.sentimentSum += analysis.sentiment_score;
+        existing.sentimentCount++;
+      }
+      entityMap.set(key, existing);
+    });
+  });
+
+  const entities = Array.from(entityMap.entries())
+    .map(([name, data]) => ({
+      name,
+      type: data.type,
+      count: data.count,
+      avg_sentiment: data.sentimentCount > 0
+        ? Number((data.sentimentSum / data.sentimentCount).toFixed(2))
+        : 0,
+    }))
+    .sort((a, b) => b.count - a.count);
+
+  const buffer = await generateExcel({
+    results: mappedResults,
+    trends,
+    competitors: competitorSummaries,
+    kpi,
+    aiBriefing,
+    projectCompetitors: (project.competitors as string[]) || [],
+    entities,
+  });
 
   return new Response(new Uint8Array(buffer), {
     headers: {

@@ -70,13 +70,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Failed to create jobs: ' + jobsError.message }, { status: 500 });
   }
 
-  // Best-effort worker trigger (may fail on Vercel serverless — dashboard handles fallback)
-  const baseUrl = new URL(request.url).origin;
-  fetch(`${baseUrl}/api/worker`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ secret: process.env.WORKER_SECRET }),
-  }).catch(() => {});
+  // Processing is browser-driven: the dashboard's processJobsLoop() detects
+  // the active scan and starts processing jobs automatically.
 
   return NextResponse.json({ scan_id: scan.id, total_tasks: totalTasks }, { status: 201 });
 }

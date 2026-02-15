@@ -8,8 +8,9 @@ import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
 import { ResultsTable } from '@/components/dashboard/results-table';
-import { SerpResultWithAnalysis } from '@/types/database';
-import { ChevronLeft, ChevronRight, Filter } from 'lucide-react';
+import { SerpResultWithAnalysis, Sentiment } from '@/types/database';
+import { ChevronLeft, ChevronRight, Filter, LayoutGrid, List } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 
 export default function ResultsPage() {
   const params = useParams();
@@ -19,6 +20,7 @@ export default function ResultsPage() {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [scans, setScans] = useState<{ id: string; completed_at: string }[]>([]);
+  const [viewMode, setViewMode] = useState<'intelligence' | 'table'>('intelligence');
 
   // Filters
   const [keyword, setKeyword] = useState('');
@@ -87,9 +89,27 @@ export default function ResultsPage() {
 
   return (
     <div className="space-y-5 animate-fade-in-up">
-      <div>
-        <h1 className="text-2xl font-bold text-primary">Risultati</h1>
-        <p className="text-sm text-muted-foreground mt-1">{total} risultati trovati</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-primary">Risultati</h1>
+          <p className="text-sm text-muted-foreground mt-1">{total} risultati trovati</p>
+        </div>
+        <div className="flex items-center gap-2 bg-muted/50 rounded-lg p-1">
+          <button
+            onClick={() => setViewMode('intelligence')}
+            className={`p-1.5 rounded-md transition-colors ${viewMode === 'intelligence' ? 'bg-white shadow-sm text-accent' : 'text-muted-foreground hover:text-primary'}`}
+            title="Vista Intelligence"
+          >
+            <LayoutGrid className="h-4 w-4" />
+          </button>
+          <button
+            onClick={() => setViewMode('table')}
+            className={`p-1.5 rounded-md transition-colors ${viewMode === 'table' ? 'bg-white shadow-sm text-accent' : 'text-muted-foreground hover:text-primary'}`}
+            title="Vista Tabella"
+          >
+            <List className="h-4 w-4" />
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -182,10 +202,86 @@ export default function ResultsPage() {
         <div className="h-64 rounded-xl animate-shimmer" />
       ) : (
         <>
-          <ResultsTable
-            results={results}
-            onTagClick={(tag) => { setTagFilter(tag); setPage(1); }}
-          />
+          {viewMode === 'intelligence' ? (
+            <div className="space-y-3">
+              {results.map((result) => {
+                const analysis = result.ai_analysis;
+                return (
+                  <div
+                    key={result.id}
+                    className={`bg-white rounded-xl shadow-sm p-4 space-y-2.5 hover:shadow-md transition-shadow ${result.is_competitor ? 'border-l-4 border-l-orange' : 'border border-border/40'}`}
+                  >
+                    {/* Row 1: Title + domain + position + sentiment + source badge */}
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-2 flex-wrap min-w-0">
+                        <a
+                          href={result.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-accent hover:underline text-sm font-medium truncate"
+                        >
+                          {result.title}
+                        </a>
+                        <span className="text-xs text-muted-foreground">{result.domain}</span>
+                        <span className="text-xs bg-muted rounded px-1.5 py-0.5 font-mono text-muted-foreground">
+                          #{result.position}
+                        </span>
+                        {analysis && (
+                          <Badge variant={analysis.sentiment as Sentiment}>
+                            {analysis.sentiment}
+                          </Badge>
+                        )}
+                      </div>
+                      <Badge variant="outline" className="text-xs flex-shrink-0">
+                        {result.source === 'google_organic' ? 'Web' : 'News'}
+                      </Badge>
+                    </div>
+
+                    {/* Row 2: AI Summary */}
+                    {analysis?.summary && (
+                      <p className="text-sm text-muted-foreground leading-relaxed">
+                        {analysis.summary}
+                      </p>
+                    )}
+
+                    {/* Row 3: Tag chips + Entity chips */}
+                    {((analysis?.themes && analysis.themes.length > 0) || (analysis?.entities && analysis.entities.length > 0)) && (
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {analysis?.themes?.map((t) => (
+                          <span
+                            key={t.name}
+                            className="text-xs bg-accent/10 text-accent rounded-full px-2 py-0.5 cursor-pointer hover:bg-accent/20 transition-colors font-medium"
+                            onClick={() => { setTagFilter(t.name); setPage(1); }}
+                          >
+                            {t.name}
+                          </span>
+                        ))}
+                        {analysis?.entities?.map((e, i) => (
+                          <span
+                            key={i}
+                            className="text-xs bg-teal/10 text-teal rounded-full px-2 py-0.5"
+                          >
+                            {e.name}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+
+              {results.length === 0 && (
+                <div className="p-12 text-center text-muted-foreground bg-white rounded-xl shadow-sm">
+                  Nessun risultato trovato
+                </div>
+              )}
+            </div>
+          ) : (
+            <ResultsTable
+              results={results}
+              onTagClick={(tag) => { setTagFilter(tag); setPage(1); }}
+            />
+          )}
 
           {totalPages > 1 && (
             <div className="flex items-center justify-between pt-2">
