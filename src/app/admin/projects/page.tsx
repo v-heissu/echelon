@@ -5,12 +5,15 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Plus, ExternalLink, Play, Search, Calendar, Globe, FolderOpen, Trash2 } from 'lucide-react';
+import { Plus, ExternalLink, Play, Search, Calendar, Globe, FolderOpen, Trash2, Loader2, Unlock } from 'lucide-react';
 import { Project } from '@/types/database';
 
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<(Project & { scans: { status: string; completed_at: string }[] })[]>([]);
   const [loading, setLoading] = useState(true);
+  const [scanningSlug, setScanningSlug] = useState<string | null>(null);
+  const [resettingSlug, setResettingSlug] = useState<string | null>(null);
+
   const loadProjects = useCallback(async () => {
     try {
       const res = await fetch('/api/admin/projects');
@@ -29,18 +32,57 @@ export default function ProjectsPage() {
     loadProjects();
   }, [loadProjects]);
 
+  // Poll while a scan is running to update the UI
+  useEffect(() => {
+    if (!scanningSlug) return;
+    const interval = setInterval(loadProjects, 10000);
+    return () => clearInterval(interval);
+  }, [scanningSlug, loadProjects]);
+
   async function triggerScan(slug: string) {
-    const res = await fetch('/api/scans/trigger', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ project_slug: slug }),
-    });
-    if (res.ok) {
-      alert('Scan avviata!');
+    setScanningSlug(slug);
+    try {
+      const res = await fetch('/api/scans/trigger', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ project_slug: slug }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        alert(`Scan completata! ${data.processed}/${data.total_tasks} task elaborati.`);
+      } else {
+        const data = await res.json();
+        alert('Errore: ' + data.error);
+      }
+    } catch {
+      alert('Errore di rete o timeout. Controlla lo stato dalla dashboard.');
+    } finally {
+      setScanningSlug(null);
       loadProjects();
-    } else {
-      const data = await res.json();
-      alert('Errore: ' + data.error);
+    }
+  }
+
+  async function resetScans(slug: string) {
+    if (!confirm('Sbloccare tutte le scan bloccate per questo progetto? I job in stato "processing" da più di 5 minuti saranno resettati a "pending".')) return;
+    setResettingSlug(slug);
+    try {
+      const res = await fetch('/api/scans/reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ project_slug: slug }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        alert(`Sblocco completato: ${data.reset_jobs} job resettati, ${data.completed_scans} scan completate.`);
+      } else {
+        const data = await res.json();
+        alert('Errore: ' + data.error);
+      }
+    } catch {
+      alert('Errore di rete.');
+    } finally {
+      setResettingSlug(null);
+      loadProjects();
     }
   }
 
@@ -95,6 +137,9 @@ export default function ProjectsPage() {
           const lastScan = project.scans
             ?.sort((a, b) => (b.completed_at || '').localeCompare(a.completed_at || ''))[0];
           const keywords = project.keywords as string[];
+          const isScanning = scanningSlug === project.slug;
+          const isResetting = resettingSlug === project.slug;
+          const hasRunningScan = project.scans?.some(s => s.status === 'running');
 
           return (
             <Card key={project.id} className="border-0 shadow-md hover:shadow-lg transition-shadow duration-200 overflow-hidden">
@@ -107,9 +152,17 @@ export default function ProjectsPage() {
                   >
                     {project.name}
                   </Link>
-                  <Badge variant={project.is_active ? 'positive' : 'outline'}>
-                    {project.is_active ? 'Attivo' : 'Inattivo'}
-                  </Badge>
+                  <div className="flex items-center gap-1.5">
+                    {(isScanning || hasRunningScan) && (
+                      <Badge variant="outline" className="text-accent border-accent/30 gap-1">
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        Scan in corso
+                      </Badge>
+                    )}
+                    <Badge variant={project.is_active ? 'positive' : 'outline'}>
+                      {project.is_active ? 'Attivo' : 'Inattivo'}
+                    </Badge>
+                  </div>
                 </div>
 
                 <div className="space-y-2.5 mb-5">
@@ -151,9 +204,28 @@ export default function ProjectsPage() {
                     size="sm"
                     className="gap-1.5"
                     onClick={() => triggerScan(project.slug)}
+                    disabled={isScanning}
                   >
-                    <Play className="h-3.5 w-3.5" />
-                    Scan
+                    {isScanning ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Play className="h-3.5 w-3.5" />
+                    )}
+                    {isScanning ? 'In corso...' : 'Scan'}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8 text-muted-foreground hover:text-orange"
+                    onClick={() => resetScans(project.slug)}
+                    disabled={isResetting}
+                    title="Sblocca scan bloccate"
+                  >
+                    {isResetting ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Unlock className="h-3.5 w-3.5" />
+                    )}
                   </Button>
                   <Button
                     variant="ghost"
