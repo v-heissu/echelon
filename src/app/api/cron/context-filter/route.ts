@@ -16,19 +16,19 @@ export async function GET(request: Request) {
   }
 
   try {
-    const results = await runContextFilterAll(24);
+    const results = await runContextFilterAll();
 
     const summary = {
       projects_processed: results.length,
       total_evaluated: results.reduce((sum, r) => sum + r.total_evaluated, 0),
       total_off_topic: results.reduce((sum, r) => sum + r.marked_off_topic, 0),
-      total_on_topic: results.reduce((sum, r) => sum + r.marked_on_topic, 0),
+      total_deleted: results.reduce((sum, r) => sum + r.deleted, 0),
       errors: results.flatMap((r) => r.errors),
       details: results.map((r) => ({
         project: r.project_slug,
         evaluated: r.total_evaluated,
         off_topic: r.marked_off_topic,
-        on_topic: r.marked_on_topic,
+        deleted: r.deleted,
       })),
     };
 

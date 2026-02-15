@@ -8,13 +8,19 @@ import { Select } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
 import { ResultsTable } from '@/components/dashboard/results-table';
 import { SerpResultWithAnalysis, Sentiment } from '@/types/database';
-import { ChevronLeft, ChevronRight, Filter, LayoutGrid, List, AlertTriangle, RotateCcw } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Filter, LayoutGrid, List, AlertTriangle, RotateCcw, Ban, X, Loader2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
 interface FilterOptions {
   keywords: string[];
   scans: { id: string; completed_at: string }[];
   tags: string[];
+}
+
+interface BlacklistEntry {
+  id: string;
+  tag_name: string;
+  created_at: string;
 }
 
 export default function ResultsPage() {
@@ -28,6 +34,12 @@ export default function ResultsPage() {
   const [filterOptions, setFilterOptions] = useState<FilterOptions>({ keywords: [], scans: [], tags: [] });
   const [viewMode, setViewMode] = useState<'intelligence' | 'table'>('intelligence');
   const initializedRef = useRef(false);
+
+  // Blacklist state
+  const [blacklist, setBlacklist] = useState<BlacklistEntry[]>([]);
+  const [showBlacklist, setShowBlacklist] = useState(false);
+  const [blacklisting, setBlacklisting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   // Filters - initialize from URL params for drill-down from dashboard
   const [keyword, setKeyword] = useState(urlSearchParams.get('keyword') || '');
@@ -86,12 +98,88 @@ export default function ResultsPage() {
     setLoading(false);
   }, [slug, page, keyword, source, sentiment, selectedScan, competitorOnly, priorityOnly, tagFilter, entityFilter]);
 
+  const loadBlacklist = useCallback(async () => {
+    const res = await fetch(`/api/projects/${slug}/tag-blacklist`);
+    if (res.ok) {
+      const data = await res.json();
+      setBlacklist(data.blacklist || []);
+    }
+  }, [slug]);
+
   useEffect(() => {
     if (!initializedRef.current) {
       initializedRef.current = true;
     }
     loadResults();
   }, [loadResults]);
+
+  useEffect(() => {
+    loadBlacklist();
+  }, [loadBlacklist]);
+
+  async function handleBlacklistTag(tag: string) {
+    if (!confirm(`Aggiungere "${tag}" alla blacklist? Tutti i risultati con questo tag verranno eliminati.`)) return;
+    setBlacklisting(true);
+    try {
+      const res = await fetch(`/api/projects/${slug}/tag-blacklist`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tag }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        alert(`Tag "${tag}" aggiunto alla blacklist. ${data.deleted} risultati eliminati.`);
+        loadResults();
+        loadBlacklist();
+      } else {
+        const data = await res.json();
+        alert('Errore: ' + data.error);
+      }
+    } catch {
+      alert('Errore di rete.');
+    } finally {
+      setBlacklisting(false);
+    }
+  }
+
+  async function handleRemoveFromBlacklist(tag: string) {
+    try {
+      const res = await fetch(`/api/projects/${slug}/tag-blacklist`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tag }),
+      });
+      if (res.ok) {
+        loadBlacklist();
+      }
+    } catch {
+      alert('Errore di rete.');
+    }
+  }
+
+  async function handleDeleteSelected(ids: string[]) {
+    if (!confirm(`Eliminare ${ids.length} risultati selezionati?`)) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/projects/${slug}/results`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        alert(`${data.deleted} risultati eliminati.`);
+        loadResults();
+      } else {
+        const data = await res.json();
+        alert('Errore: ' + data.error);
+      }
+    } catch {
+      alert('Errore di rete.');
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   const totalPages = Math.ceil(total / 50);
 
@@ -102,23 +190,74 @@ export default function ResultsPage() {
           <h1 className="text-2xl font-bold text-primary">Risultati</h1>
           <p className="text-sm text-muted-foreground mt-1">{total} risultati trovati</p>
         </div>
-        <div className="flex items-center gap-2 bg-muted/50 rounded-lg p-1">
+        <div className="flex items-center gap-3">
+          {/* Blacklist toggle */}
           <button
-            onClick={() => setViewMode('intelligence')}
-            className={`p-1.5 rounded-md transition-colors ${viewMode === 'intelligence' ? 'bg-white shadow-sm text-accent' : 'text-muted-foreground hover:text-primary'}`}
-            title="Vista Intelligence"
+            onClick={() => setShowBlacklist(!showBlacklist)}
+            className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors ${
+              showBlacklist ? 'bg-destructive/10 text-destructive' : 'bg-muted/50 text-muted-foreground hover:text-primary'
+            }`}
           >
-            <LayoutGrid className="h-4 w-4" />
+            <Ban className="h-3.5 w-3.5" />
+            Blacklist{blacklist.length > 0 ? ` (${blacklist.length})` : ''}
           </button>
-          <button
-            onClick={() => setViewMode('table')}
-            className={`p-1.5 rounded-md transition-colors ${viewMode === 'table' ? 'bg-white shadow-sm text-accent' : 'text-muted-foreground hover:text-primary'}`}
-            title="Vista Tabella"
-          >
-            <List className="h-4 w-4" />
-          </button>
+
+          <div className="flex items-center gap-2 bg-muted/50 rounded-lg p-1">
+            <button
+              onClick={() => setViewMode('intelligence')}
+              className={`p-1.5 rounded-md transition-colors ${viewMode === 'intelligence' ? 'bg-white shadow-sm text-accent' : 'text-muted-foreground hover:text-primary'}`}
+              title="Vista Intelligence"
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => setViewMode('table')}
+              className={`p-1.5 rounded-md transition-colors ${viewMode === 'table' ? 'bg-white shadow-sm text-accent' : 'text-muted-foreground hover:text-primary'}`}
+              title="Vista Tabella"
+            >
+              <List className="h-4 w-4" />
+            </button>
+          </div>
         </div>
       </div>
+
+      {/* Blacklist panel */}
+      {showBlacklist && (
+        <Card className="border-0 shadow-md border-l-4 border-l-destructive/30">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Ban className="w-4 h-4 text-destructive" />
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Tag Blacklist</span>
+              </div>
+              <span className="text-xs text-muted-foreground">
+                I risultati con questi tag vengono eliminati automaticamente
+              </span>
+            </div>
+            {blacklist.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Nessun tag in blacklist. Clicca l&apos;icona <Ban className="h-3 w-3 inline" /> su un tag per aggiungerlo.</p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {blacklist.map((entry) => (
+                  <span
+                    key={entry.id}
+                    className="inline-flex items-center gap-1.5 bg-destructive/10 text-destructive text-xs px-2.5 py-1 rounded-full font-medium"
+                  >
+                    {entry.tag_name}
+                    <button
+                      onClick={() => handleRemoveFromBlacklist(entry.tag_name)}
+                      className="hover:text-destructive/80 transition-colors"
+                      title="Rimuovi dalla blacklist"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Filters */}
       <Card className="border-0 shadow-md">
@@ -251,6 +390,13 @@ export default function ResultsPage() {
         </CardContent>
       </Card>
 
+      {(blacklisting || deleting) && (
+        <div className="flex items-center gap-2 text-sm text-accent">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          {blacklisting ? 'Applicazione blacklist...' : 'Eliminazione in corso...'}
+        </div>
+      )}
+
       {loading ? (
         <div className="h-64 rounded-xl animate-shimmer" />
       ) : (
@@ -321,10 +467,20 @@ export default function ResultsPage() {
                         {analysis?.themes?.map((t) => (
                           <span
                             key={t.name}
-                            className="text-xs bg-accent/10 text-accent rounded-full px-2 py-0.5 cursor-pointer hover:bg-accent/20 transition-colors font-medium"
+                            className="inline-flex items-center gap-0.5 text-xs bg-accent/10 text-accent rounded-full px-2 py-0.5 cursor-pointer hover:bg-accent/20 transition-colors font-medium group"
                             onClick={() => { setTagFilter(t.name); setPage(1); }}
                           >
                             {t.name}
+                            <button
+                              className="ml-0.5 opacity-0 group-hover:opacity-100 transition-opacity text-destructive/60 hover:text-destructive"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleBlacklistTag(t.name);
+                              }}
+                              title={`Blacklist "${t.name}"`}
+                            >
+                              <Ban className="h-3 w-3" />
+                            </button>
                           </span>
                         ))}
                         {analysis?.entities?.map((e, i) => (
@@ -352,6 +508,9 @@ export default function ResultsPage() {
             <ResultsTable
               results={results}
               onTagClick={(tag) => { setTagFilter(tag); setPage(1); }}
+              onBlacklistTag={handleBlacklistTag}
+              onDeleteSelected={handleDeleteSelected}
+              selectable
             />
           )}
 

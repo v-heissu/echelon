@@ -28,7 +28,6 @@ export interface Project {
   location_code: number;
   alert_keywords: string[];
   project_context: string | null;
-  last_filter_at: string | null;
   last_normalize_at: string | null;
   is_active: boolean;
   created_at: string;
@@ -89,8 +88,6 @@ export interface AiAnalysis {
   language_detected: string;
   is_hi_priority: boolean;
   priority_reason: string | null;
-  is_off_topic: boolean;
-  off_topic_reason: string | null;
   analyzed_at: string;
 }
 
@@ -101,6 +98,13 @@ export interface Tag {
   slug: string;
   count: number;
   last_seen_at: string;
+}
+
+export interface TagBlacklist {
+  id: string;
+  project_id: string;
+  tag_name: string;
+  created_at: string;
 }
 
 export interface JobQueue {

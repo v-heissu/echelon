@@ -11,19 +11,23 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ChevronDown, ChevronUp, ExternalLink, Sparkles, AlertTriangle } from 'lucide-react';
+import { ChevronDown, ChevronUp, ExternalLink, Sparkles, AlertTriangle, Ban, Trash2 } from 'lucide-react';
 import { SerpResultWithAnalysis, Sentiment } from '@/types/database';
 import { truncate } from '@/lib/utils';
 
 interface ResultsTableProps {
   results: SerpResultWithAnalysis[];
   onTagClick?: (tag: string) => void;
+  onBlacklistTag?: (tag: string) => void;
+  onDeleteSelected?: (ids: string[]) => void;
+  selectable?: boolean;
 }
 
-export function ResultsTable({ results, onTagClick }: ResultsTableProps) {
+export function ResultsTable({ results, onTagClick, onBlacklistTag, onDeleteSelected, selectable = false }: ResultsTableProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [sortField, setSortField] = useState<string>('position');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   function handleSort(field: string) {
     if (sortField === field) {
@@ -31,6 +35,21 @@ export function ResultsTable({ results, onTagClick }: ResultsTableProps) {
     } else {
       setSortField(field);
       setSortDir('asc');
+    }
+  }
+
+  function toggleSelect(id: string) {
+    const next = new Set(selectedIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelectedIds(next);
+  }
+
+  function toggleSelectAll() {
+    if (selectedIds.size === results.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(results.map((r) => r.id)));
     }
   }
 
@@ -53,9 +72,44 @@ export function ResultsTable({ results, onTagClick }: ResultsTableProps) {
 
   return (
     <div className="bg-white rounded-xl border-0 shadow-md overflow-hidden">
+      {/* Bulk actions bar */}
+      {selectable && selectedIds.size > 0 && (
+        <div className="flex items-center gap-3 px-4 py-2.5 bg-accent/5 border-b border-accent/10">
+          <span className="text-sm text-accent font-medium">{selectedIds.size} selezionati</span>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5 text-destructive border-destructive/30 hover:bg-destructive/10"
+            onClick={() => {
+              onDeleteSelected?.(Array.from(selectedIds));
+              setSelectedIds(new Set());
+            }}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            Elimina
+          </Button>
+          <button
+            onClick={() => setSelectedIds(new Set())}
+            className="text-xs text-muted-foreground hover:text-primary ml-auto"
+          >
+            Deseleziona
+          </button>
+        </div>
+      )}
+
       <Table>
         <TableHeader>
           <TableRow>
+            {selectable && (
+              <TableHead className="w-[40px]">
+                <input
+                  type="checkbox"
+                  checked={selectedIds.size === results.length && results.length > 0}
+                  onChange={toggleSelectAll}
+                  className="rounded border-border"
+                />
+              </TableHead>
+            )}
             <TableHead className="cursor-pointer w-[60px]" onClick={() => handleSort('position')}>
               # <SortIcon field="position" />
             </TableHead>
@@ -83,8 +137,18 @@ export function ResultsTable({ results, onTagClick }: ResultsTableProps) {
               <>
                 <TableRow
                   key={result.id}
-                  className={`hover:bg-muted/30 transition-colors ${result.is_competitor ? 'border-l-4 border-l-orange' : ''}`}
+                  className={`hover:bg-muted/30 transition-colors ${result.is_competitor ? 'border-l-4 border-l-orange' : ''} ${selectedIds.has(result.id) ? 'bg-accent/5' : ''}`}
                 >
+                  {selectable && (
+                    <TableCell>
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(result.id)}
+                        onChange={() => toggleSelect(result.id)}
+                        className="rounded border-border"
+                      />
+                    </TableCell>
+                  )}
                   <TableCell className="font-mono text-sm text-muted-foreground">
                     <div className="flex items-center gap-1">
                       {result.position}
@@ -132,10 +196,22 @@ export function ResultsTable({ results, onTagClick }: ResultsTableProps) {
                       {analysis?.themes?.slice(0, 2).map((t) => (
                         <span
                           key={t.name}
-                          className="inline-block bg-accent/10 text-accent text-xs px-2 py-0.5 rounded-full cursor-pointer hover:bg-accent/20 transition-colors font-medium"
+                          className="inline-flex items-center gap-0.5 bg-accent/10 text-accent text-xs px-2 py-0.5 rounded-full cursor-pointer hover:bg-accent/20 transition-colors font-medium group"
                           onClick={() => onTagClick?.(t.name)}
                         >
                           {t.name}
+                          {onBlacklistTag && (
+                            <button
+                              className="ml-0.5 opacity-0 group-hover:opacity-100 transition-opacity text-destructive/60 hover:text-destructive"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onBlacklistTag(t.name);
+                              }}
+                              title={`Blacklist "${t.name}"`}
+                            >
+                              <Ban className="h-3 w-3" />
+                            </button>
+                          )}
                         </span>
                       ))}
                     </div>
@@ -158,7 +234,7 @@ export function ResultsTable({ results, onTagClick }: ResultsTableProps) {
 
                 {isExpanded && (
                   <TableRow key={`${result.id}-expanded`}>
-                    <TableCell colSpan={8} className="bg-muted/30 p-5">
+                    <TableCell colSpan={selectable ? 9 : 8} className="bg-muted/30 p-5">
                       <div className="space-y-4 text-sm animate-fade-in-up">
                         {analysis?.summary && (
                           <div>
@@ -196,10 +272,22 @@ export function ResultsTable({ results, onTagClick }: ResultsTableProps) {
                               {analysis.themes.map((t) => (
                                 <span
                                   key={t.name}
-                                  className="inline-block bg-accent/10 text-accent text-xs px-2.5 py-1 rounded-full cursor-pointer hover:bg-accent/20 transition-colors font-medium"
+                                  className="inline-flex items-center gap-1 bg-accent/10 text-accent text-xs px-2.5 py-1 rounded-full cursor-pointer hover:bg-accent/20 transition-colors font-medium group"
                                   onClick={() => onTagClick?.(t.name)}
                                 >
                                   {t.name}{typeof t.confidence === 'number' && !isNaN(t.confidence) ? ` (${(t.confidence * 100).toFixed(0)}%)` : ''}
+                                  {onBlacklistTag && (
+                                    <button
+                                      className="opacity-0 group-hover:opacity-100 transition-opacity text-destructive/60 hover:text-destructive"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        onBlacklistTag(t.name);
+                                      }}
+                                      title={`Blacklist "${t.name}"`}
+                                    >
+                                      <Ban className="h-3 w-3" />
+                                    </button>
+                                  )}
                                 </span>
                               ))}
                             </div>

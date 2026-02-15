@@ -96,29 +96,27 @@ export default function ProjectsPage() {
     setFilteringSlug(slug);
     let totalEvaluated = 0;
     let totalOffTopic = 0;
-    let totalOnTopic = 0;
+    let totalDeleted = 0;
 
     try {
-      // First call: force reset + process first batch
-      setFilterProgress('Reset valutazioni precedenti...');
-      const resetRes = await fetch(`/api/projects/${slug}/filter`, {
+      setFilterProgress('Avvio filtro...');
+      const firstRes = await fetch(`/api/projects/${slug}/filter`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ force: true }),
       });
-      if (!resetRes.ok) {
-        const data = await resetRes.json();
+      if (!firstRes.ok) {
+        const data = await firstRes.json();
         alert('Errore: ' + data.error);
         return;
       }
-      let batch = await resetRes.json();
+      let batch = await firstRes.json();
       totalEvaluated += batch.total_evaluated;
       totalOffTopic += batch.marked_off_topic;
-      totalOnTopic += batch.marked_on_topic;
+      totalDeleted += batch.deleted || 0;
 
       // Loop until done
       while (batch.status === 'processing') {
-        setFilterProgress(`Filtro in corso... ${totalEvaluated} valutati, ${batch.remaining} rimanenti`);
+        setFilterProgress(`Filtro in corso... ${totalEvaluated} valutati, ${totalDeleted} eliminati, ${batch.remaining} rimanenti`);
 
         // Rate limit between batches
         await new Promise(resolve => setTimeout(resolve, 2000));
@@ -135,13 +133,13 @@ export default function ProjectsPage() {
         batch = await res.json();
         totalEvaluated += batch.total_evaluated;
         totalOffTopic += batch.marked_off_topic;
-        totalOnTopic += batch.marked_on_topic;
+        totalDeleted += batch.deleted || 0;
       }
 
-      alert(`Context filter completato per "${slug}":\n${totalEvaluated} risultati valutati\n${totalOffTopic} off-topic\n${totalOnTopic} pertinenti`);
+      alert(`Context filter completato per "${slug}":\n${totalEvaluated} risultati valutati\n${totalOffTopic} off-topic identificati\n${totalDeleted} eliminati`);
     } catch {
       if (totalEvaluated > 0) {
-        alert(`Filtro parziale per "${slug}":\n${totalEvaluated} risultati valutati finora\n${totalOffTopic} off-topic\n${totalOnTopic} pertinenti\n\nRiprova per completare i rimanenti.`);
+        alert(`Filtro parziale per "${slug}":\n${totalEvaluated} risultati valutati finora\n${totalDeleted} eliminati\n\nRiprova per completare i rimanenti.`);
       } else {
         alert('Errore di rete. Riprova.');
       }

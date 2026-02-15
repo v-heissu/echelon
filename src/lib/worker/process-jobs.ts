@@ -4,6 +4,7 @@ import { extractContent } from '@/lib/extraction/content';
 import { GeminiClient } from '@/lib/gemini/client';
 import { extractDomain } from '@/lib/utils';
 import { generateBriefingForScan } from '@/lib/agents/briefing';
+import { applyBlacklistToResults } from '@/lib/agents/blacklist';
 
 export interface ProcessResult {
   status: 'processed' | 'no_jobs' | 'error';
@@ -236,6 +237,17 @@ export async function processOneJob(): Promise<ProcessResult> {
 
         if (scan.project_id) {
           await updateTags(supabase, scan.project_id, job.scan_id, analysis.results);
+
+          // Apply tag blacklist: delete results whose themes match blacklisted tags
+          const insertedSerpIds = savedResults.map((r: { id: string }) => r.id);
+          try {
+            const blacklisted = await applyBlacklistToResults(scan.project_id, insertedSerpIds);
+            if (blacklisted > 0) {
+              console.log(`[processOneJob] Blacklist removed ${blacklisted} results`);
+            }
+          } catch (blErr) {
+            console.error('[processOneJob] Blacklist check failed:', blErr);
+          }
         }
       } catch (aiError) {
         console.error('AI analysis failed, continuing without:', aiError);
