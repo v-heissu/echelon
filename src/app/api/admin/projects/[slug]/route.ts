@@ -50,7 +50,6 @@ export async function PUT(
   if (body.language !== undefined) updateData.language = body.language;
   if (body.location_code !== undefined) updateData.location_code = body.location_code;
   if (body.is_active !== undefined) updateData.is_active = body.is_active;
-  if (body.alert_keywords !== undefined) updateData.alert_keywords = Array.isArray(body.alert_keywords) ? body.alert_keywords.slice(0, 15) : [];
 
   const { data: project, error } = await admin
     .from('projects')
@@ -60,6 +59,21 @@ export async function PUT(
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Update alert_keywords separately to isolate potential JSONB issues
+  if (body.alert_keywords !== undefined) {
+    const alertKw = Array.isArray(body.alert_keywords) ? body.alert_keywords.slice(0, 15) : [];
+    console.log('[PUT] Saving alert_keywords for', params.slug, ':', JSON.stringify(alertKw));
+    const { error: akError } = await admin
+      .from('projects')
+      .update({ alert_keywords: alertKw })
+      .eq('slug', params.slug);
+    if (akError) {
+      console.error('[PUT] alert_keywords update failed:', akError.message);
+      return NextResponse.json({ error: 'alert_keywords: ' + akError.message }, { status: 500 });
+    }
+    project.alert_keywords = alertKw;
+  }
 
   return NextResponse.json(project);
 }
