@@ -172,10 +172,11 @@ export async function GET(
         }
       });
 
-      // Use date_from (monitored period start) like publication timeline
-      // Fall back to date_to, then started_at
+      // Use date_to (period end) as the chart date — this is unique per scan.
+      // date_from can collide: scan 1 (date_from=null) falls back to date_to
+      // which equals scan 2's date_from.
       sentimentTimeline.push({
-        date: scan.date_from || scan.date_to || scan.started_at,
+        date: scan.date_to || scan.date_from || scan.started_at,
         ...counts,
       });
     }
@@ -268,11 +269,10 @@ export async function GET(
         for (const scan of timelineScans) {
           const count = countsByScan.get(scan.id) || 0;
           if (count === 0) continue;
-          // Use date_from (the monitored period start) as the timeline date.
-          // For the first scan (date_from=null, covers "beginning of time" → date_to),
-          // fall back to date_to, then started_at.
+          // Use date_to (period end) as the timeline date — unique per scan.
+          // date_from can collide with next scan's date_from when first scan has date_from=null.
           publicationTimeline.push({
-            date: scan.date_from || scan.date_to || scan.started_at,
+            date: scan.date_to || scan.date_from || scan.started_at,
             count,
             scanId: scan.id,
           });
