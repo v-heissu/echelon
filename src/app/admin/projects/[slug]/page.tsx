@@ -39,6 +39,7 @@ export default function EditProjectPage() {
     location_code: 2380,
     is_active: true,
     alert_keywords: [] as string[],
+    project_context: '',
   });
   const [newAlertKw, setNewAlertKw] = useState('');
 
@@ -59,6 +60,7 @@ export default function EditProjectPage() {
         location_code: data.location_code,
         is_active: data.is_active,
         alert_keywords: Array.isArray(data.alert_keywords) ? data.alert_keywords : [],
+        project_context: data.project_context || '',
       });
     }
     setLoading(false);
@@ -89,6 +91,7 @@ export default function EditProjectPage() {
         keywords: form.keywords.split('\n').map((k) => k.trim()).filter(Boolean),
         competitors: form.competitors.split(/[\n,]/).map((c) => c.trim()).filter(Boolean).slice(0, 20),
         alert_keywords: form.alert_keywords,
+        project_context: form.project_context.trim() || null,
       }),
     });
 
@@ -214,6 +217,17 @@ export default function EditProjectPage() {
                 value={form.industry}
                 onChange={(e) => setForm({ ...form, industry: e.target.value })}
               />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-muted-foreground mb-1.5">Contesto Progetto</label>
+              <textarea
+                className="flex w-full rounded-md border border-border bg-white px-3 py-2 text-sm min-h-[80px] ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 placeholder:text-muted-foreground"
+                value={form.project_context}
+                onChange={(e) => setForm({ ...form, project_context: e.target.value })}
+                placeholder="Es. Monitoraggio reputazione online del brand XYZ nel settore fintech italiano, focus su competitor diretti e sentiment media..."
+              />
+              <p className="text-xs text-muted-foreground mt-1">Opzionale. Descrive lo scopo del progetto per arricchire i briefing AI con contesto mirato.</p>
             </div>
 
             <div>

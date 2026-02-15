@@ -27,6 +27,7 @@ export interface Project {
   language: string;
   location_code: number;
   alert_keywords: string[];
+  project_context: string | null;
   is_active: boolean;
   created_at: string;
 }

@@ -50,6 +50,7 @@ export async function PUT(
   if (body.language !== undefined) updateData.language = body.language;
   if (body.location_code !== undefined) updateData.location_code = body.location_code;
   if (body.is_active !== undefined) updateData.is_active = body.is_active;
+  if (body.project_context !== undefined) updateData.project_context = body.project_context || null;
 
   const { data: project, error } = await admin
     .from('projects')

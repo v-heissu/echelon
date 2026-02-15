@@ -484,6 +484,13 @@ async function generateAiBriefing(supabase: ReturnType<typeof createAdminClient>
     return;
   }
 
+  // Fetch project info for context-aware briefing
+  const { data: project } = await supabase
+    .from('projects')
+    .select('name, industry, project_context')
+    .eq('id', scan.project_id)
+    .single();
+
   // 2. Get current scan's aggregated data
   const currentStats = await getScanStats(supabase, scanId);
 
@@ -517,9 +524,13 @@ async function generateAiBriefing(supabase: ReturnType<typeof createAdminClient>
     },
   });
 
-  const prompt = `Sei un analista di intelligence competitiva. Confronta questi dati SERP della scan corrente con la scan precedente. In 3-5 frasi in italiano: cosa è cambiato? Quali temi sono emersi o scomparsi? Quali competitor si sono mossi? Il sentiment è migliorato o peggiorato? Sii conciso e actionable.
+  const projectInfo = project
+    ? `PROGETTO: ${project.name}${project.industry ? ` | Settore: ${project.industry}` : ''}${project.project_context ? `\nCONTESTO: ${project.project_context}` : ''}\n\n`
+    : '';
 
-DATI:
+  const prompt = `Sei un analista di intelligence competitiva. ${project?.project_context ? 'Tieni conto del contesto e dello scopo del progetto per dare un briefing mirato e rilevante. ' : ''}Confronta questi dati SERP della scan corrente con la scan precedente. In 3-5 frasi in italiano: cosa è cambiato? Quali temi sono emersi o scomparsi? Quali competitor si sono mossi? Il sentiment è migliorato o peggiorato? Sii conciso e actionable.
+
+${projectInfo}DATI:
 ${JSON.stringify({ current: currentStats, previous: previousStats }, null, 2)}
 
 Rispondi SOLO con il testo del briefing, nessun JSON, nessun markdown.`;
