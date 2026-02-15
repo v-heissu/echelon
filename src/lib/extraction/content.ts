@@ -1,6 +1,4 @@
 import * as cheerio from 'cheerio';
-import { JSDOM } from 'jsdom';
-import { Readability } from '@mozilla/readability';
 
 const MAX_EXCERPT_LENGTH = 2000;
 const FETCH_TIMEOUT = 8000;
@@ -25,33 +23,11 @@ export async function extractContent(url: string): Promise<string | null> {
     if (!response.ok) return null;
 
     const html = await response.text();
-
-    // Try Readability first (better for articles/news content)
-    const readabilityResult = extractWithReadability(html, url);
-    if (readabilityResult) {
-      return readabilityResult.slice(0, MAX_EXCERPT_LENGTH);
+    const result = extractWithCheerio(html);
+    if (result) {
+      return result.slice(0, MAX_EXCERPT_LENGTH);
     }
 
-    // Fallback to Cheerio (lightweight, handles edge cases)
-    const cheerioResult = extractWithCheerio(html);
-    if (cheerioResult) {
-      return cheerioResult.slice(0, MAX_EXCERPT_LENGTH);
-    }
-
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-function extractWithReadability(html: string, url: string): string | null {
-  try {
-    const dom = new JSDOM(html, { url });
-    const reader = new Readability(dom.window.document);
-    const article = reader.parse();
-    if (article && article.textContent && article.textContent.trim().length > 100) {
-      return article.textContent.trim();
-    }
     return null;
   } catch {
     return null;

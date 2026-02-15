@@ -10,7 +10,6 @@
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
-    "@mozilla/readability": "^0.6.0",
     "@nivo/bar": "^0.99.0",
     "@nivo/circle-packing": "^0.99.0",
     "@nivo/core": "^0.99.0",
@@ -22,7 +21,6 @@
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "exceljs": "^4.4.0",
-    "jsdom": "^28.0.0",
     "lucide-react": "^0.563.0",
     "next": "14.2.35",
     "react": "^18",
@@ -31,7 +29,6 @@
     "tailwind-merge": "^3.4.0"
   },
   "devDependencies": {
-    "@types/jsdom": "^27.0.0",
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
