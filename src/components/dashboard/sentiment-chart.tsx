@@ -104,10 +104,30 @@ function SentimentDonut({ data, onSentimentClick }: { data: SentimentData; onSen
   );
 }
 
+function formatSentimentLabel(dateStr: string, spanDays: number): string {
+  const d = new Date(dateStr);
+  if (spanDays <= 7) {
+    return d.toLocaleDateString('it-IT', { day: '2-digit', month: 'short' }) +
+      ' ' + d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+  }
+  if (spanDays <= 90) {
+    return d.toLocaleDateString('it-IT', { day: '2-digit', month: 'short' });
+  }
+  if (spanDays <= 365) {
+    return d.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' });
+  }
+  return d.toLocaleDateString('it-IT', { month: 'short', year: '2-digit' });
+}
+
 function SentimentArea({ data, onSentimentClick }: { data: SentimentData[]; onSentimentClick?: (s: string) => void }) {
+  const dates = data.filter(d => d.date).map(d => new Date(d.date).getTime());
+  const minDate = Math.min(...dates);
+  const maxDate = Math.max(...dates);
+  const spanDays = Math.max(1, Math.round((maxDate - minDate) / (1000 * 60 * 60 * 24)));
+
   const chartData = data.map((d) => ({
     ...d,
-    date: d.date ? new Date(d.date).toLocaleDateString('it-IT', { day: '2-digit', month: 'short' }) : '',
+    date: d.date ? formatSentimentLabel(d.date, spanDays) : '',
   }));
 
   return (
