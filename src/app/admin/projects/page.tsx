@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Plus, ExternalLink, Play, Search, Calendar, Globe, FolderOpen, Trash2, Loader2, Unlock, Settings } from 'lucide-react';
+import { Plus, ExternalLink, Play, Search, Calendar, Globe, FolderOpen, Trash2, Loader2, Unlock, Settings, Filter } from 'lucide-react';
 import { Project } from '@/types/database';
 
 export default function ProjectsPage() {
@@ -13,6 +13,7 @@ export default function ProjectsPage() {
   const [loading, setLoading] = useState(true);
   const [scanningSlug, setScanningSlug] = useState<string | null>(null);
   const [resettingSlug, setResettingSlug] = useState<string | null>(null);
+  const [filteringSlug, setFilteringSlug] = useState<string | null>(null);
   const [scanDates, setScanDates] = useState<Record<string, string>>({});
 
   const loadProjects = useCallback(async () => {
@@ -88,6 +89,27 @@ export default function ProjectsPage() {
     }
   }
 
+  async function triggerFilter(slug: string) {
+    setFilteringSlug(slug);
+    try {
+      const res = await fetch(`/api/projects/${slug}/filter`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        alert(`Context filter completato per "${slug}":\n${data.total_evaluated} risultati valutati\n${data.marked_off_topic} off-topic\n${data.marked_on_topic} pertinenti`);
+      } else {
+        const data = await res.json();
+        alert('Errore: ' + data.error);
+      }
+    } catch {
+      alert('Errore di rete. Riprova.');
+    } finally {
+      setFilteringSlug(null);
+    }
+  }
+
   async function deleteProject(slug: string, name: string) {
     if (!confirm(`Eliminare "${name}"? Tutti i dati (scan, risultati, analisi) saranno persi.`)) return;
     try {
@@ -141,6 +163,7 @@ export default function ProjectsPage() {
           const keywords = project.keywords as string[];
           const isScanning = scanningSlug === project.slug;
           const isResetting = resettingSlug === project.slug;
+          const isFiltering = filteringSlug === project.slug;
           const hasRunningScan = project.scans?.some(s => s.status === 'running');
 
           return (
@@ -230,6 +253,20 @@ export default function ProjectsPage() {
                       <Play className="h-3.5 w-3.5" />
                     )}
                     {isScanning ? 'In corso...' : 'Scan'}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8 text-muted-foreground hover:text-accent"
+                    onClick={() => triggerFilter(project.slug)}
+                    disabled={isFiltering}
+                    title="Filtra risultati off-topic"
+                  >
+                    {isFiltering ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Filter className="h-3.5 w-3.5" />
+                    )}
                   </Button>
                   <Button
                     variant="outline"
