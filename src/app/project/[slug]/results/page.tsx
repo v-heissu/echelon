@@ -13,8 +13,19 @@ import { Badge } from '@/components/ui/badge';
 
 interface FilterOptions {
   keywords: string[];
-  scans: { id: string; completed_at: string }[];
+  scans: { id: string; completed_at: string; date_from: string | null; date_to: string | null }[];
   tags: string[];
+}
+
+function formatScanPeriod(scan: { date_from: string | null; date_to: string | null; completed_at: string }): string {
+  const fmt = (iso: string) => new Date(iso).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' });
+  if (scan.date_from && scan.date_to) {
+    return `${fmt(scan.date_from)} → ${fmt(scan.date_to)}`;
+  }
+  if (scan.date_to) {
+    return `fino al ${fmt(scan.date_to)}`;
+  }
+  return fmt(scan.completed_at);
 }
 
 interface BlacklistEntry {
@@ -279,16 +290,16 @@ export default function ResultsPage() {
           </div>
           <div className="flex flex-wrap gap-3 items-end">
             <div>
-              <label className="block text-xs font-medium text-muted-foreground mb-1">Scan</label>
+              <label className="block text-xs font-medium text-muted-foreground mb-1">Periodo scan</label>
               <Select
                 value={selectedScan}
                 onChange={(e) => { setSelectedScan(e.target.value); setPage(1); }}
-                className="w-[180px]"
+                className="w-[260px]"
               >
                 <option value="">Tutte le scan</option>
                 {filterOptions.scans.map((s) => (
                   <option key={s.id} value={s.id}>
-                    {new Date(s.completed_at).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' })}
+                    {formatScanPeriod(s)}
                   </option>
                 ))}
               </Select>

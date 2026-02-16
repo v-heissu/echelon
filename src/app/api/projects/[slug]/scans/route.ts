@@ -36,7 +36,7 @@ export async function GET(
 
   const { data: scans, error: scansErr } = await admin
     .from('scans')
-    .select('id, status, trigger_type, started_at, completed_at, total_tasks, completed_tasks')
+    .select('id, status, trigger_type, started_at, completed_at, total_tasks, completed_tasks, date_from, date_to')
     .eq('project_id', project.id)
     .order('started_at', { ascending: false });
 
