@@ -242,7 +242,20 @@ export function ResultsTable({ results, onTagClick, onBlacklistTag, onDeleteSele
                               <Sparkles className="w-3.5 h-3.5 text-accent" />
                               <span className="font-semibold text-primary text-xs uppercase tracking-wide">Sommario AI</span>
                             </div>
-                            <p className="text-muted-foreground leading-relaxed">{analysis.summary}</p>
+                            <p className="text-muted-foreground leading-relaxed">
+                              {(() => {
+                                const firstSentenceEnd = analysis.summary.search(/[.!?]\s/);
+                                if (firstSentenceEnd > 0 && firstSentenceEnd < analysis.summary.length - 2) {
+                                  return (
+                                    <>
+                                      <span className="font-medium text-foreground">{analysis.summary.slice(0, firstSentenceEnd + 1)}</span>
+                                      {analysis.summary.slice(firstSentenceEnd + 1)}
+                                    </>
+                                  );
+                                }
+                                return analysis.summary;
+                              })()}
+                            </p>
                           </div>
                         )}
                         {result.excerpt && (

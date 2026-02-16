@@ -6,15 +6,13 @@ import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
-import { Download, FileSpreadsheet, Loader2, Trash2, Calendar, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { Download, FileSpreadsheet, Loader2 } from 'lucide-react';
 
 interface ScanInfo {
   id: string;
   status: string;
   started_at: string | null;
   completed_at: string | null;
-  total_tasks: number;
-  completed_tasks: number;
 }
 
 export default function ExportPage() {
@@ -23,7 +21,6 @@ export default function ExportPage() {
   const [scans, setScans] = useState<ScanInfo[]>([]);
   const [selectedScan, setSelectedScan] = useState('');
   const [downloading, setDownloading] = useState(false);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     loadScans();
@@ -41,9 +38,10 @@ export default function ExportPage() {
     if (project) {
       const { data } = await supabase
         .from('scans')
-        .select('id, status, started_at, completed_at, total_tasks, completed_tasks')
+        .select('id, status, started_at, completed_at')
         .eq('project_id', project.id)
-        .order('started_at', { ascending: false })
+        .eq('status', 'completed')
+        .order('completed_at', { ascending: false })
         .limit(20);
       setScans(data || []);
     }
@@ -71,28 +69,11 @@ export default function ExportPage() {
     setDownloading(false);
   }
 
-  async function handleDeleteScan(scanId: string) {
-    if (!confirm('Sei sicuro di voler eliminare questa scansione? Tutti i dati associati verranno cancellati.')) return;
-
-    setDeletingId(scanId);
-    const res = await fetch(`/api/scans/${scanId}`, { method: 'DELETE' });
-    if (res.ok) {
-      setScans(scans.filter((s) => s.id !== scanId));
-      if (selectedScan === scanId) setSelectedScan('');
-    } else {
-      const data = await res.json().catch(() => ({}));
-      alert(data.error || 'Errore durante la cancellazione');
-    }
-    setDeletingId(null);
-  }
-
-  const completedScans = scans.filter((s) => s.status === 'completed');
-
   return (
     <div className="space-y-6 animate-fade-in-up">
       <div>
-        <h1 className="text-2xl font-bold text-primary">Export & Scansioni</h1>
-        <p className="text-sm text-muted-foreground mt-1">Scarica i dati e gestisci le scansioni</p>
+        <h1 className="text-2xl font-bold text-primary">Export Dati</h1>
+        <p className="text-sm text-muted-foreground mt-1">Scarica i dati del progetto in formato Excel</p>
       </div>
 
       <Card className="max-w-lg border-0 shadow-md overflow-hidden">
@@ -104,7 +85,7 @@ export default function ExportPage() {
             </div>
             <div>
               <h3 className="font-semibold text-primary">Export Excel</h3>
-              <p className="text-xs text-muted-foreground">Risultati, Trend Summary e Competitor Analysis</p>
+              <p className="text-xs text-muted-foreground">Risultati, Trend Summary, Competitor Analysis e Alert Prioritari</p>
             </div>
           </div>
 
@@ -115,7 +96,7 @@ export default function ExportPage() {
               onChange={(e) => setSelectedScan(e.target.value)}
             >
               <option value="">Tutti i dati</option>
-              {completedScans.map((s) => (
+              {scans.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.completed_at ? new Date(s.completed_at).toLocaleDateString('it-IT', {
                     day: '2-digit',
@@ -145,79 +126,6 @@ export default function ExportPage() {
               </>
             )}
           </Button>
-        </CardContent>
-      </Card>
-
-      {/* Scan management */}
-      <Card className="border-0 shadow-md overflow-hidden">
-        <CardContent className="p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center">
-              <Calendar className="w-4 h-4 text-accent" />
-            </div>
-            <h3 className="font-semibold text-primary">Scansioni</h3>
-            <span className="text-xs text-muted-foreground">({scans.length})</span>
-          </div>
-
-          {scans.length > 0 ? (
-            <div className="space-y-2">
-              {scans.map((scan) => (
-                <div
-                  key={scan.id}
-                  className="flex items-center justify-between py-3 px-3 rounded-lg hover:bg-muted/30 transition-colors group"
-                >
-                  <div className="flex items-center gap-3">
-                    {scan.status === 'completed' && <CheckCircle2 className="w-4 h-4 text-positive shrink-0" />}
-                    {scan.status === 'running' && <Loader2 className="w-4 h-4 text-accent animate-spin shrink-0" />}
-                    {scan.status === 'failed' && <AlertTriangle className="w-4 h-4 text-destructive shrink-0" />}
-                    <div>
-                      <p className="text-sm font-medium text-primary">
-                        {scan.completed_at
-                          ? new Date(scan.completed_at).toLocaleDateString('it-IT', {
-                              day: '2-digit',
-                              month: 'long',
-                              year: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })
-                          : scan.started_at
-                          ? new Date(scan.started_at).toLocaleDateString('it-IT', {
-                              day: '2-digit',
-                              month: 'long',
-                              year: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })
-                          : 'Data non disponibile'}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {scan.completed_tasks}/{scan.total_tasks} task
-                        {scan.status === 'running' && ' (in corso)'}
-                        {scan.status === 'failed' && ' (fallita)'}
-                      </p>
-                    </div>
-                  </div>
-
-                  {scan.status !== 'running' && (
-                    <button
-                      onClick={() => handleDeleteScan(scan.id)}
-                      disabled={deletingId === scan.id}
-                      className="opacity-0 group-hover:opacity-100 p-2 rounded-lg hover:bg-red-50 text-muted-foreground hover:text-destructive transition-all"
-                      title="Elimina scansione"
-                    >
-                      {deletingId === scan.id ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Trash2 className="w-4 h-4" />
-                      )}
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground text-center py-6">Nessuna scansione disponibile.</p>
-          )}
         </CardContent>
       </Card>
     </div>

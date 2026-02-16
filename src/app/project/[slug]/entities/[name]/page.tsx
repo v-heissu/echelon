@@ -220,20 +220,34 @@ export default function EntityDetailPage() {
         </CardContent>
       </Card>
 
-      {/* AI Summary placeholder */}
-      <Card className="border-0 shadow-sm rounded-2xl">
-        <CardContent className="p-5">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-gold/20 to-orange/20 flex items-center justify-center">
-              <Sparkles className="w-5 h-5 text-gold" />
-            </div>
-            <div>
+      {/* AI Summary — generated from top results */}
+      {results.length > 0 && results.some(r => r.summary) && (
+        <Card className="border-0 shadow-sm rounded-2xl">
+          <CardContent className="p-5">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-gold/20 to-orange/20 flex items-center justify-center">
+                <Sparkles className="w-5 h-5 text-gold" />
+              </div>
               <h3 className="font-semibold text-primary text-sm">Sommario AI</h3>
-              <p className="text-sm text-muted-foreground">Sommario AI disponibile a breve</p>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+            <div className="space-y-2">
+              {results
+                .filter(r => r.summary)
+                .sort((a, b) => a.position - b.position)
+                .slice(0, 5)
+                .map((r, i) => (
+                  <p key={r.id} className="text-sm text-muted-foreground leading-relaxed">
+                    {i === 0 ? (
+                      <span className="font-medium text-foreground">{r.summary}</span>
+                    ) : (
+                      r.summary
+                    )}
+                  </p>
+                ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Main content grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

@@ -76,9 +76,11 @@ export function ThemeBubbleChart({ data }: ThemeBubbleChartProps) {
                 }}
                 title={`${theme.name}: ${theme.count} occorrenze\nSentiment: ${theme.sentiment} (${score >= 0 ? '+' : ''}${score.toFixed(2)})`}
               >
-                <span className="truncate px-1.5 text-center leading-tight" style={{ fontSize: Math.max(9, size / 8.5) }}>
-                  {theme.name}
-                </span>
+                {size >= 80 && (
+                  <span className="truncate px-1.5 text-center leading-tight" style={{ fontSize: Math.max(9, size / 8.5) }}>
+                    {theme.name}
+                  </span>
+                )}
               </div>
             );
           })}
