@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 
-export async function DELETE(
+export async function POST(
   _request: Request,
   { params }: { params: { id: string } }
 ) {
@@ -43,38 +43,22 @@ export async function DELETE(
     }
   }
 
-  // If scan is still running, stop it first
-  if (scan.status === 'running') {
-    await admin
-      .from('job_queue')
-      .update({ status: 'failed', error_message: 'Scan eliminata', completed_at: new Date().toISOString() })
-      .eq('scan_id', scan.id)
-      .in('status', ['pending', 'processing']);
-
-    await admin
-      .from('scans')
-      .update({ status: 'failed', completed_at: new Date().toISOString() })
-      .eq('id', scan.id);
+  if (scan.status !== 'running') {
+    return NextResponse.json({ error: 'Scan is not running' }, { status: 400 });
   }
 
-  // Delete in order: ai_analysis → serp_results → job_queue → scan
-  const { data: serpResults } = await admin
-    .from('serp_results')
-    .select('id')
-    .eq('scan_id', scan.id);
+  // Cancel all pending and processing jobs
+  await admin
+    .from('job_queue')
+    .update({ status: 'failed', error_message: 'Scan interrotta manualmente', completed_at: new Date().toISOString() })
+    .eq('scan_id', scan.id)
+    .in('status', ['pending', 'processing']);
 
-  const serpIds = serpResults?.map((r: { id: string }) => r.id) || [];
+  // Mark scan as failed with completed_at
+  await admin
+    .from('scans')
+    .update({ status: 'failed', completed_at: new Date().toISOString() })
+    .eq('id', scan.id);
 
-  if (serpIds.length > 0) {
-    await admin.from('ai_analysis').delete().in('serp_result_id', serpIds);
-  }
-
-  await admin.from('serp_results').delete().eq('scan_id', scan.id);
-  await admin.from('job_queue').delete().eq('scan_id', scan.id);
-  await admin.from('scans').delete().eq('id', scan.id);
-
-  // Clear project tags cache (will be rebuilt on next request)
-  await admin.from('tags').delete().eq('project_id', scan.project_id);
-
-  return NextResponse.json({ success: true });
+  return NextResponse.json({ success: true, message: 'Scan interrotta' });
 }

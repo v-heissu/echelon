@@ -8,7 +8,7 @@ import { SentimentChart } from '@/components/dashboard/sentiment-chart';
 import { ThemeTreemap } from '@/components/dashboard/theme-treemap';
 import { PublicationTimeline } from '@/components/dashboard/publication-timeline';
 import { ExecutiveSummary } from '@/components/dashboard/executive-summary';
-import { BarChart3, Loader2, ChevronDown, ChevronUp, CheckCircle2, XCircle, Clock, Timer, AlertTriangle, Zap } from 'lucide-react';
+import { BarChart3, Loader2, ChevronDown, ChevronUp, CheckCircle2, XCircle, Clock, Timer, AlertTriangle, Zap, StopCircle, Trash2 } from 'lucide-react';
 
 interface DashboardData {
   kpi: { total_results: number; unique_domains: number; competitor_mentions: number; avg_sentiment: number; alert_count: number };
@@ -62,6 +62,7 @@ export default function ProjectDashboard() {
   const [loading, setLoading] = useState(true);
   const [jobDetails, setJobDetails] = useState<ScanJob[]>([]);
   const [showJobDetails, setShowJobDetails] = useState(false);
+  const [scanAction, setScanAction] = useState<'stopping' | 'deleting' | null>(null);
   const mountedRef = useRef(true);
   const scanIdRef = useRef<string | null>(null);
 
@@ -148,6 +149,34 @@ export default function ProjectDashboard() {
     }
   }, [loadData]);
 
+  const handleStopScan = useCallback(async () => {
+    if (!scanIdRef.current) return;
+    if (!window.confirm('Interrompere la scansione in corso? I job non ancora completati verranno annullati.')) return;
+    setScanAction('stopping');
+    try {
+      const res = await fetch(`/api/scans/${scanIdRef.current}/stop`, { method: 'POST' });
+      if (res.ok) {
+        scanIdRef.current = null;
+        await loadData();
+      }
+    } catch { /* network error */ }
+    setScanAction(null);
+  }, [loadData]);
+
+  const handleDeleteScan = useCallback(async () => {
+    if (!scanIdRef.current) return;
+    if (!window.confirm('Eliminare la scansione in corso? Tutti i risultati e i job verranno cancellati permanentemente.')) return;
+    setScanAction('deleting');
+    try {
+      const res = await fetch(`/api/scans/${scanIdRef.current}`, { method: 'DELETE' });
+      if (res.ok) {
+        scanIdRef.current = null;
+        await loadData();
+      }
+    } catch { /* network error */ }
+    setScanAction(null);
+  }, [loadData]);
+
   // Poll: fast during scan (3s for status, 15s for full data), slow otherwise (60s)
   // Also kick off browser-driven processing when a scan is active
   useEffect(() => {
@@ -231,9 +260,29 @@ export default function ProjectDashboard() {
                     {activeScan.completed_tasks}/{activeScan.total_tasks} ({scanProgress}%)
                   </span>
                 </div>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Elaborazione in corso. Non chiudere questa pagina fino al completamento.
-                </p>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <p className="text-xs text-muted-foreground">
+                    Elaborazione in corso.
+                  </p>
+                  <button
+                    onClick={handleStopScan}
+                    disabled={scanAction !== null}
+                    className="inline-flex items-center gap-1 text-xs text-orange-600 hover:text-orange-700 font-medium disabled:opacity-50"
+                    title="Interrompi scansione"
+                  >
+                    {scanAction === 'stopping' ? <Loader2 className="h-3 w-3 animate-spin" /> : <StopCircle className="h-3 w-3" />}
+                    Interrompi
+                  </button>
+                  <button
+                    onClick={handleDeleteScan}
+                    disabled={scanAction !== null}
+                    className="inline-flex items-center gap-1 text-xs text-destructive hover:text-destructive/80 font-medium disabled:opacity-50"
+                    title="Elimina scansione"
+                  >
+                    {scanAction === 'deleting' ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
+                    Elimina
+                  </button>
+                </div>
               </div>
             </div>
 

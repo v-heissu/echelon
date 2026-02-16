@@ -21,6 +21,7 @@ import {
   Loader2,
   Clock,
   AlertTriangle,
+  StopCircle,
 } from 'lucide-react';
 
 interface ScanData {
@@ -90,6 +91,7 @@ export default function ScansPage() {
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
+  const [stoppingScanId, setStoppingScanId] = useState<string | null>(null);
 
   async function loadScans() {
     try {
@@ -113,9 +115,9 @@ export default function ScansPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug]);
 
-  // Only non-running scans are selectable
+  // All scans are now selectable (running scans can be stopped+deleted)
   const selectableScans = useMemo(
-    () => scans.filter((s) => s.status !== 'running'),
+    () => scans,
     [scans]
   );
 
@@ -168,6 +170,16 @@ export default function ScansPage() {
     if (failed > 0) {
       alert(`${failed} scansion${failed === 1 ? 'e' : 'i'} non sono state eliminate. Potrebbe mancare il permesso.`);
     }
+  };
+
+  const handleStopScan = async (scanId: string) => {
+    if (!window.confirm('Interrompere la scansione in corso? I job non ancora completati verranno annullati.')) return;
+    setStoppingScanId(scanId);
+    try {
+      await fetch(`/api/scans/${scanId}/stop`, { method: 'POST' });
+    } catch { /* network error */ }
+    setStoppingScanId(null);
+    await loadScans();
   };
 
   if (loading) {
@@ -243,6 +255,7 @@ export default function ScansPage() {
                   <TableHead>Task</TableHead>
                   <TableHead>Risultati</TableHead>
                   <TableHead>Tipo</TableHead>
+                  <TableHead className="w-20">Azioni</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -260,8 +273,7 @@ export default function ScansPage() {
                           type="checkbox"
                           checked={isSelected}
                           onChange={() => toggleSelect(scan.id)}
-                          disabled={isRunning}
-                          className="rounded border-border cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                          className="rounded border-border cursor-pointer"
                         />
                       </TableCell>
                       <TableCell>
@@ -298,6 +310,23 @@ export default function ScansPage() {
                         <span className="text-xs text-muted-foreground capitalize">
                           {scan.trigger_type || 'manual'}
                         </span>
+                      </TableCell>
+                      <TableCell>
+                        {isRunning && (
+                          <button
+                            onClick={() => handleStopScan(scan.id)}
+                            disabled={stoppingScanId === scan.id}
+                            className="inline-flex items-center gap-1 text-xs text-orange-600 hover:text-orange-700 font-medium disabled:opacity-50"
+                            title="Interrompi scansione"
+                          >
+                            {stoppingScanId === scan.id ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <StopCircle className="h-3.5 w-3.5" />
+                            )}
+                            Stop
+                          </button>
+                        )}
                       </TableCell>
                     </TableRow>
                   );
