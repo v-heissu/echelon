@@ -90,6 +90,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Failed to create jobs: ' + jobsError.message }, { status: 500 });
   }
 
+  // Fire-and-forget: kick off server-side processing (maxDuration 300s)
+  // so the scan runs without needing the browser to stay open.
+  const baseUrl = process.env.VERCEL_URL
+    ? `https://${process.env.VERCEL_URL}`
+    : 'http://localhost:3000';
+
+  fetch(`${baseUrl}/api/scans/${scan.id}/run`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${process.env.CRON_SECRET}` },
+  }).catch(() => {});
+
   return NextResponse.json({
     scan_id: scan.id,
     total_tasks: totalTasks,
