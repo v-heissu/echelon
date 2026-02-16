@@ -19,8 +19,12 @@ interface CompetitorSummary {
   avg_sentiment: number;
 }
 
+interface ExportResult extends SerpResultWithAnalysis {
+  scan_completed_at?: string | null;
+}
+
 interface ExportData {
-  results: SerpResultWithAnalysis[];
+  results: ExportResult[];
   trends: TrendSummary[];
   competitors: CompetitorSummary[];
   kpi?: { total_results: number; unique_domains: number; competitor_mentions: number; avg_sentiment: number };
@@ -47,8 +51,19 @@ function applyHeaderStyle(sheet: ExcelJS.Worksheet): void {
 }
 
 function setAutoFilter(sheet: ExcelJS.Worksheet, columnCount: number): void {
-  const lastColumnLetter = String.fromCharCode(64 + columnCount);
+  const lastColumnLetter = String.fromCharCode(64 + Math.min(columnCount, 26));
   sheet.autoFilter = { from: 'A1', to: `${lastColumnLetter}1` };
+}
+
+function applyAutoWidth(sheet: ExcelJS.Worksheet): void {
+  sheet.columns.forEach(col => {
+    let maxLen = 10;
+    col.eachCell?.({ includeEmpty: false }, cell => {
+      const len = String(cell.value || '').length;
+      if (len > maxLen) maxLen = Math.min(len, 60);
+    });
+    col.width = maxLen + 2;
+  });
 }
 
 export async function generateExcel(data: ExportData): Promise<Buffer> {
@@ -145,7 +160,8 @@ export async function generateExcel(data: ExportData): Promise<Buffer> {
   // ---------------------------------------------------------------------------
   const resultsSheet = workbook.addWorksheet('Risultati');
   resultsSheet.columns = [
-    { header: 'Data Scan', key: 'date', width: 15 },
+    { header: 'Data Scan', key: 'scan_date', width: 15 },
+    { header: 'Data Pubblicazione', key: 'pub_date', width: 15 },
     { header: 'Keyword', key: 'keyword', width: 20 },
     { header: 'Source', key: 'source', width: 15 },
     { header: 'Posizione', key: 'position', width: 10 },
@@ -160,21 +176,24 @@ export async function generateExcel(data: ExportData): Promise<Buffer> {
     { header: 'Temi', key: 'themes', width: 30 },
     { header: 'Entità', key: 'entities', width: 30 },
     { header: 'Sommario AI', key: 'summary', width: 50 },
+    { header: 'Alert', key: 'alert', width: 8 },
+    { header: 'Motivo Alert', key: 'alert_reason', width: 40 },
   ];
 
   applyHeaderStyle(resultsSheet);
-  setAutoFilter(resultsSheet, 15);
+  setAutoFilter(resultsSheet, 18);
 
   results.forEach((r) => {
     resultsSheet.addRow({
-      date: r.fetched_at ? new Date(r.fetched_at).toLocaleDateString('it-IT') : '',
+      scan_date: r.scan_completed_at ? new Date(r.scan_completed_at).toLocaleDateString('it-IT') : '',
+      pub_date: r.fetched_at ? new Date(r.fetched_at).toLocaleDateString('it-IT') : '',
       keyword: r.keyword,
       source: r.source,
       position: r.position,
       title: r.title,
       url: r.url,
       domain: r.domain,
-      is_competitor: r.is_competitor ? 'Si' : 'No',
+      is_competitor: r.is_competitor ? 'Sì' : 'No',
       snippet: r.snippet,
       excerpt: r.excerpt || '',
       sentiment: r.ai_analysis?.sentiment || '',
@@ -182,8 +201,12 @@ export async function generateExcel(data: ExportData): Promise<Buffer> {
       themes: r.ai_analysis?.themes?.map((t) => t.name).join(', ') || '',
       entities: r.ai_analysis?.entities?.map((e) => e.name).join(', ') || '',
       summary: r.ai_analysis?.summary || '',
+      alert: r.ai_analysis?.is_hi_priority ? 'Sì' : 'No',
+      alert_reason: r.ai_analysis?.priority_reason || '',
     });
   });
+
+  applyAutoWidth(resultsSheet);
 
   // ---------------------------------------------------------------------------
   // Sheet 3: Competitor Analysis (filtered by projectCompetitors)
@@ -226,6 +249,8 @@ export async function generateExcel(data: ExportData): Promise<Buffer> {
     });
   });
 
+  applyAutoWidth(compSheet);
+
   // ---------------------------------------------------------------------------
   // Sheet 4: Entita
   // ---------------------------------------------------------------------------
@@ -250,6 +275,8 @@ export async function generateExcel(data: ExportData): Promise<Buffer> {
       });
     });
   }
+
+  applyAutoWidth(entitySheet);
 
   // ---------------------------------------------------------------------------
   // Sheet 5: Trend Summary (existing, kept as-is)
@@ -277,6 +304,41 @@ export async function generateExcel(data: ExportData): Promise<Buffer> {
       trend: t.trend_direction,
     });
   });
+
+  applyAutoWidth(trendSheet);
+
+  // ---------------------------------------------------------------------------
+  // Sheet 6: Alert Prioritari
+  // ---------------------------------------------------------------------------
+  const alertSheet = workbook.addWorksheet('Alert Prioritari');
+  alertSheet.columns = [
+    { header: 'Data Scan', key: 'scan_date', width: 15 },
+    { header: 'Titolo', key: 'title', width: 40 },
+    { header: 'URL', key: 'url', width: 40 },
+    { header: 'Dominio', key: 'domain', width: 25 },
+    { header: 'Keyword', key: 'keyword', width: 20 },
+    { header: 'Motivo Alert', key: 'alert_reason', width: 50 },
+    { header: 'Sommario AI', key: 'summary', width: 50 },
+  ];
+
+  applyHeaderStyle(alertSheet);
+  setAutoFilter(alertSheet, 7);
+
+  // Filter only high-priority results
+  const alertResults = results.filter(r => r.ai_analysis?.is_hi_priority);
+  alertResults.forEach((r) => {
+    alertSheet.addRow({
+      scan_date: r.scan_completed_at ? new Date(r.scan_completed_at).toLocaleDateString('it-IT') : '',
+      title: r.title,
+      url: r.url,
+      domain: r.domain,
+      keyword: r.keyword,
+      alert_reason: r.ai_analysis?.priority_reason || '',
+      summary: r.ai_analysis?.summary || '',
+    });
+  });
+
+  applyAutoWidth(alertSheet);
 
   const buffer = await workbook.xlsx.writeBuffer();
   return Buffer.from(buffer);

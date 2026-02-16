@@ -37,7 +37,7 @@ export function DomainBarChart({ data }: DomainBarChartProps) {
           <BarChart data={data} layout="vertical" margin={{ left: 100 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#e2e5ea" strokeOpacity={0.8} horizontal={false} />
             <XAxis type="number" tick={{ fontSize: 11, fill: '#8b95a5' }} axisLine={false} tickLine={false} />
-            <YAxis dataKey="domain" type="category" tick={{ fontSize: 10, fill: '#8b95a5' }} width={100} axisLine={false} tickLine={false} />
+            <YAxis dataKey="domain" type="category" tick={{ fontSize: 10, fill: '#8b95a5' }} width={110} axisLine={false} tickLine={false} tickFormatter={(value: string) => value.replace(/^www\./, '')} />
             <Tooltip
               contentStyle={{
                 borderRadius: '12px',

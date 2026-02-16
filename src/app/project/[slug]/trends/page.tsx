@@ -53,7 +53,7 @@ const ITEMS_PER_PAGE = 50;
 
 const directionIcon = (dir: string) => {
   switch (dir) {
-    case 'emerging': return <TrendingUp className="h-4 w-4 text-orange" />;
+    case 'emerging': return <TrendingUp className="h-4 w-4 text-positive" />;
     case 'new': return <Sparkles className="h-4 w-4 text-accent" />;
     case 'declining': return <TrendingDown className="h-4 w-4 text-destructive" />;
     default: return <Minus className="h-4 w-4 text-muted-foreground" />;
@@ -524,7 +524,9 @@ export default function TrendsPage() {
                           {directionIcon(trend.direction)}
                           <Badge
                             variant={
-                              trend.direction === 'emerging' || trend.direction === 'new'
+                              trend.direction === 'emerging'
+                                ? 'positive'
+                                : trend.direction === 'new'
                                 ? 'mixed'
                                 : trend.direction === 'declining'
                                 ? 'negative'

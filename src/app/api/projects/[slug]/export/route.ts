@@ -37,11 +37,17 @@ export async function GET(
 
   const { data: results } = await query;
 
-  // Map to expected format
-  const mappedResults = (results || []).map((r) => ({
-    ...r,
-    ai_analysis: Array.isArray(r.ai_analysis) ? r.ai_analysis[0] || null : r.ai_analysis,
-  }));
+  // Map to expected format, including scan completed_at
+  const mappedResults = (results || []).map((r) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const scansData = (r as any).scans;
+    const scanCompletedAt = scansData?.completed_at || null;
+    return {
+      ...r,
+      ai_analysis: Array.isArray(r.ai_analysis) ? r.ai_analysis[0] || null : r.ai_analysis,
+      scan_completed_at: scanCompletedAt,
+    };
+  });
 
   // Generate trend summaries
   const themeMap = new Map<string, {

@@ -457,7 +457,19 @@ export default function ResultsPage() {
                     {/* Row 2: AI Summary */}
                     {analysis?.summary && (
                       <p className="text-sm text-muted-foreground leading-relaxed">
-                        {analysis.summary}
+                        {(() => {
+                          const s = analysis.summary;
+                          const idx = s.search(/[.!?]\s/);
+                          if (idx > 0 && idx < s.length - 2) {
+                            return (
+                              <>
+                                <span className="font-medium text-foreground">{s.slice(0, idx + 1)}</span>
+                                {s.slice(idx + 1)}
+                              </>
+                            );
+                          }
+                          return s;
+                        })()}
                       </p>
                     )}
 
