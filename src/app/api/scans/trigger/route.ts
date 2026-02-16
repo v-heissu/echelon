@@ -92,14 +92,20 @@ export async function POST(request: Request) {
 
   // Fire-and-forget: kick off server-side processing (maxDuration 300s)
   // so the scan runs without needing the browser to stay open.
+  // We await briefly (100ms) to ensure the HTTP request is actually dispatched
+  // before this function returns — otherwise Vercel may kill the process
+  // before the request leaves. The browser processJobsLoop is the fallback.
   const baseUrl = process.env.VERCEL_URL
     ? `https://${process.env.VERCEL_URL}`
     : 'http://localhost:3000';
 
-  fetch(`${baseUrl}/api/scans/${scan.id}/run`, {
+  const runPromise = fetch(`${baseUrl}/api/scans/${scan.id}/run`, {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${process.env.CRON_SECRET}` },
   }).catch(() => {});
+
+  // Wait up to 100ms — enough for the request to be sent, not enough to delay the response
+  await Promise.race([runPromise, new Promise(resolve => setTimeout(resolve, 100))]);
 
   return NextResponse.json({
     scan_id: scan.id,
