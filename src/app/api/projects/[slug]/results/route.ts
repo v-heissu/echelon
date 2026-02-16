@@ -119,7 +119,7 @@ export async function GET(
   const [scansResult, tagsResult] = await Promise.all([
     admin
       .from('scans')
-      .select('id, completed_at, started_at')
+      .select('id, completed_at, started_at, date_from, date_to')
       .eq('project_id', project.id)
       .eq('status', 'completed')
       .order('completed_at', { ascending: false })
@@ -142,6 +142,8 @@ export async function GET(
       scans: (scansResult.data || []).map((s) => ({
         id: s.id,
         completed_at: s.completed_at || s.started_at,
+        date_from: s.date_from,
+        date_to: s.date_to,
       })),
       tags: (tagsResult.data || []).map((t) => t.name as string),
     },

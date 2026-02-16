@@ -13,6 +13,22 @@ interface ScanInfo {
   status: string;
   started_at: string | null;
   completed_at: string | null;
+  date_from: string | null;
+  date_to: string | null;
+}
+
+function formatScanPeriod(scan: ScanInfo): string {
+  const fmt = (iso: string) => new Date(iso).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' });
+  if (scan.date_from && scan.date_to) {
+    return `${fmt(scan.date_from)} → ${fmt(scan.date_to)}`;
+  }
+  if (scan.date_to) {
+    return `fino al ${fmt(scan.date_to)}`;
+  }
+  if (scan.completed_at) {
+    return fmt(scan.completed_at);
+  }
+  return 'In corso';
 }
 
 export default function ExportPage() {
@@ -38,7 +54,7 @@ export default function ExportPage() {
     if (project) {
       const { data } = await supabase
         .from('scans')
-        .select('id, status, started_at, completed_at')
+        .select('id, status, started_at, completed_at, date_from, date_to')
         .eq('project_id', project.id)
         .eq('status', 'completed')
         .order('completed_at', { ascending: false })
@@ -90,7 +106,7 @@ export default function ExportPage() {
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-muted-foreground mb-1.5">Scan (opzionale)</label>
+            <label className="block text-xs font-medium text-muted-foreground mb-1.5">Periodo scan (opzionale)</label>
             <Select
               value={selectedScan}
               onChange={(e) => setSelectedScan(e.target.value)}
@@ -98,11 +114,7 @@ export default function ExportPage() {
               <option value="">Tutti i dati</option>
               {scans.map((s) => (
                 <option key={s.id} value={s.id}>
-                  {s.completed_at ? new Date(s.completed_at).toLocaleDateString('it-IT', {
-                    day: '2-digit',
-                    month: 'long',
-                    year: 'numeric',
-                  }) : 'In corso'}
+                  {formatScanPeriod(s)}
                 </option>
               ))}
             </Select>

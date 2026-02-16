@@ -30,6 +30,8 @@ interface ScanData {
   trigger_type: string;
   started_at: string | null;
   completed_at: string | null;
+  date_from: string | null;
+  date_to: string | null;
   total_tasks: number;
   completed_tasks: number;
   result_count: number;
@@ -249,8 +251,8 @@ export default function ScansPage() {
                     />
                   </TableHead>
                   <TableHead>Stato</TableHead>
-                  <TableHead>Data Inizio</TableHead>
-                  <TableHead>Data Fine</TableHead>
+                  <TableHead>Periodo Da</TableHead>
+                  <TableHead>Periodo A</TableHead>
                   <TableHead>Durata</TableHead>
                   <TableHead>Task</TableHead>
                   <TableHead>Risultati</TableHead>
@@ -283,10 +285,10 @@ export default function ScansPage() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <span className="text-sm">{formatDate(scan.started_at)}</span>
+                        <span className="text-sm">{formatDate(scan.date_from)}</span>
                       </TableCell>
                       <TableCell>
-                        <span className="text-sm">{formatDate(scan.completed_at)}</span>
+                        <span className="text-sm">{formatDate(scan.date_to)}</span>
                       </TableCell>
                       <TableCell>
                         <span className="text-sm tabular-nums">
