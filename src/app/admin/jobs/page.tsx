@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/table';
 import { formatDateTime } from '@/lib/utils';
 import { JobQueue } from '@/types/database';
-import { Clock, Loader2, CheckCircle2, XCircle, Radio, ChevronDown, ChevronUp, Timer, AlertTriangle, Zap } from 'lucide-react';
+import { Clock, Loader2, CheckCircle2, XCircle, Radio, ChevronDown, ChevronUp, Timer, AlertTriangle, Zap, StopCircle, Trash2 } from 'lucide-react';
 
 interface ScanInfo {
   id: string;
@@ -59,6 +59,7 @@ export default function JobsPage() {
   const [loading, setLoading] = useState(true);
   const [expandedScan, setExpandedScan] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
+  const [scanAction, setScanAction] = useState<string | null>(null);
 
   useEffect(() => {
     const supabase = createClient();
@@ -111,6 +112,24 @@ export default function JobsPage() {
   const filteredJobs = statusFilter
     ? jobs.filter((j) => j.status === statusFilter)
     : jobs;
+
+  const handleStopScan = async (scanId: string) => {
+    if (!window.confirm('Interrompere la scansione in corso? I job non ancora completati verranno annullati.')) return;
+    setScanAction(`stop-${scanId}`);
+    try {
+      await fetch(`/api/scans/${scanId}/stop`, { method: 'POST' });
+    } catch { /* network error */ }
+    setScanAction(null);
+  };
+
+  const handleDeleteScan = async (scanId: string) => {
+    if (!window.confirm('Eliminare la scansione? Tutti i risultati e i job verranno cancellati permanentemente.')) return;
+    setScanAction(`delete-${scanId}`);
+    try {
+      await fetch(`/api/scans/${scanId}`, { method: 'DELETE' });
+    } catch { /* network error */ }
+    setScanAction(null);
+  };
 
   if (loading) {
     return (
@@ -182,6 +201,7 @@ export default function JobsPage() {
                 <TableHead>Durata</TableHead>
                 <TableHead>Avvio</TableHead>
                 <TableHead>Fine</TableHead>
+                <TableHead className="w-28">Azioni</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -247,10 +267,33 @@ export default function JobsPage() {
                       <TableCell className="text-xs text-muted-foreground">
                         {scan.completed_at ? formatDateTime(scan.completed_at) : '—'}
                       </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          {scan.status === 'running' && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleStopScan(scan.id); }}
+                              disabled={scanAction === `stop-${scan.id}`}
+                              className="inline-flex items-center gap-1 text-xs text-orange-600 hover:text-orange-700 font-medium disabled:opacity-50"
+                              title="Interrompi"
+                            >
+                              {scanAction === `stop-${scan.id}` ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <StopCircle className="h-3.5 w-3.5" />}
+                              Stop
+                            </button>
+                          )}
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleDeleteScan(scan.id); }}
+                            disabled={scanAction === `delete-${scan.id}`}
+                            className="inline-flex items-center gap-1 text-xs text-destructive hover:text-destructive/80 font-medium disabled:opacity-50"
+                            title="Elimina"
+                          >
+                            {scanAction === `delete-${scan.id}` ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                          </button>
+                        </div>
+                      </TableCell>
                     </TableRow>
                     {isExpanded && (
                       <TableRow key={`${scan.id}-expanded`}>
-                        <TableCell colSpan={8} className="bg-[#f8f9fa] p-4">
+                        <TableCell colSpan={9} className="bg-[#f8f9fa] p-4">
                           <div className="space-y-1 animate-slide-down">
                             {/* Summary row */}
                             <div className="flex items-center gap-4 mb-3 text-xs">

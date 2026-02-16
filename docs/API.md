@@ -127,6 +127,8 @@ Crea un nuovo utente sulla piattaforma.
 | `POST` | `/api/scans/trigger` | Admin | Avvia scan manuale |
 | `POST` | `/api/scans/process` | Sessione | Processa un job dalla coda |
 | `GET` | `/api/scans/[id]/status` | Sessione | Stato progresso scan |
+| `POST` | `/api/scans/[id]/stop` | Membro | Interrompe una scan in corso |
+| `DELETE` | `/api/scans/[id]` | Membro | Elimina una scan (anche in corso) |
 | `POST` | `/api/scans/reset` | Admin | Reset job falliti/bloccati |
 
 ### `POST /api/scans/trigger`
@@ -181,6 +183,33 @@ Restituisce lo stato di avanzamento di uno scan.
   "total_tasks": 6,
   "completed_tasks": 3,
   "progress": 50
+}
+```
+
+### `POST /api/scans/[id]/stop`
+Interrompe una scansione in corso. Tutti i job pending e in processing vengono marcati come falliti.
+
+**Accesso**: Admin o membro del progetto.
+
+**Risposta:**
+```json
+{
+  "success": true,
+  "message": "Scan interrotta"
+}
+```
+
+Ritorna `400` se la scan non e in stato `running`.
+
+### `DELETE /api/scans/[id]`
+Elimina una scansione e tutti i dati associati (risultati SERP, analisi AI, job). Se la scan e in corso, viene prima interrotta automaticamente e poi eliminata.
+
+**Accesso**: Admin o membro del progetto.
+
+**Risposta:**
+```json
+{
+  "success": true
 }
 ```
 

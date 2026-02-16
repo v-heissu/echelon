@@ -95,6 +95,25 @@ Ha accesso ai soli progetti assegnati:
 - Se il giorno corrente corrisponde al `schedule_day`, lo scan parte automaticamente
 - Il cron processa i job inline entro un budget di 280 secondi
 
+#### Interrompere una scan in corso
+E possibile interrompere una scansione in qualsiasi momento:
+- **Dashboard progetto**: durante l'elaborazione, cliccare **Interrompi** nel banner di progresso
+- **Pagina Scansioni**: cliccare **Stop** nella colonna azioni della scan in corso
+- **Admin > Jobs**: cliccare **Stop** sulla riga della scansione attiva
+
+L'interruzione:
+- Annulla tutti i job non ancora completati (pending e processing)
+- Conserva i risultati gia raccolti dai job completati
+- Marca la scan come fallita con timestamp di completamento
+
+#### Eliminare una scan
+Le scansioni possono essere eliminate in qualsiasi stato, incluse quelle in corso:
+- **Pagina Scansioni**: selezionare le scan con le checkbox, poi cliccare **Elimina**
+- **Dashboard progetto**: cliccare **Elimina** nel banner di progresso (per scan in corso)
+- **Admin > Jobs**: cliccare l'icona cestino sulla riga della scansione
+
+L'eliminazione e permanente e rimuove: risultati SERP, analisi AI, job e la scan stessa. Se la scan e in corso, viene prima interrotta automaticamente.
+
 #### Scan incrementale
 - Ogni scan traccia un range temporale (`date_from` → `date_to`)
 - Il `date_from` e automaticamente impostato alla fine dell'ultimo scan completato
