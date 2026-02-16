@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { Select } from '@/components/ui/select';
 import { Tag as TagType } from '@/types/database';
@@ -114,6 +115,7 @@ export default function TagsPage() {
   const [loading, setLoading] = useState(true);
   const [rebuilding, setRebuilding] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchAll, setSearchAll] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
 
   const loadTags = useCallback(async () => {
@@ -395,6 +397,43 @@ export default function TagsPage() {
             )}
           </CardContent>
         </Card>
+      )}
+
+      {/* Accordion: tutti i temi rimanenti */}
+      {tags.length > 25 && (
+        <details className="group">
+          <summary className="flex items-center gap-2 cursor-pointer py-3 px-4 rounded-xl bg-muted/30 hover:bg-muted/50 transition-colors list-none [&::-webkit-details-marker]:hidden">
+            <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform group-open:rotate-90" />
+            <span className="text-sm font-medium text-muted-foreground">
+              Tutti i temi ({tags.length - 25} rimanenti)
+            </span>
+          </summary>
+
+          <div className="mt-3 px-1">
+            <input
+              type="text"
+              placeholder="Cerca tema..."
+              value={searchAll}
+              onChange={(e) => setSearchAll(e.target.value)}
+              className="mb-3 max-w-xs pl-3 pr-3 py-1.5 text-sm rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent"
+            />
+
+            <div className="grid grid-cols-3 gap-x-6 gap-y-1 max-h-[400px] overflow-y-auto">
+              {tags.slice(25)
+                .filter(t => !searchAll || t.name.toLowerCase().includes(searchAll.toLowerCase()))
+                .map(tag => (
+                  <Link
+                    key={tag.id}
+                    href={`/project/${slug}/tags/${encodeURIComponent(tag.slug)}`}
+                    className="flex items-center justify-between py-1.5 text-sm hover:text-accent transition-colors"
+                  >
+                    <span className="truncate">{tag.name}</span>
+                    <span className="text-xs text-muted-foreground font-mono ml-2">{tag.scan_count ?? tag.count}</span>
+                  </Link>
+                ))}
+            </div>
+          </div>
+        </details>
       )}
     </div>
   );
