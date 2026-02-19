@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import { CookieBanner } from '@/components/shared/cookie-banner';
+import { AnalyticsLoader } from '@/components/shared/analytics-loader';
 
 export const metadata: Metadata = {
   title: 'Echelon - Web Monitor',
@@ -13,7 +15,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="it">
-      <body className="font-sans antialiased">{children}</body>
+      <body className="font-sans antialiased">
+        {children}
+        <CookieBanner />
+        <AnalyticsLoader />
+      </body>
     </html>
   );
 }

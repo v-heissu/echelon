@@ -1,3 +1,7 @@
+'use client';
+
+import { reopenCookieBanner } from '@/components/shared/cookie-banner';
+
 export function Footer() {
   return (
     <footer className="py-4 px-8 bg-[#001437]">
@@ -10,7 +14,16 @@ export function Footer() {
             <span className="text-[10px] text-white/30">Cerved Group S.p.A.</span>
           </div>
         </div>
-        <p className="text-[10px] text-white/20">&copy; {new Date().getFullYear()} Tutti i diritti riservati</p>
+        <div className="flex items-center gap-2">
+          <p className="text-[10px] text-white/20">&copy; {new Date().getFullYear()} Tutti i diritti riservati</p>
+          <span className="text-white/10">|</span>
+          <button
+            onClick={() => reopenCookieBanner()}
+            className="text-[10px] text-white/30 hover:text-white/60 transition-colors"
+          >
+            Gestisci preferenze cookie
+          </button>
+        </div>
       </div>
     </footer>
   );
